@@ -82,8 +82,8 @@ export default function LoginPage() {
         setIsSubmitting(false);
         setToken(response.data.token, rememberMe);
 
-        setAdmin(response.data.isAdmin);
-        setValidUntil(response.data.valid_until);
+        setAdmin(response.data.isAdmin, rememberMe);
+        setValidUntil(response.data.valid_until, rememberMe);
 
         preload([`${apiUrl}/api/v1/members`, response.data.token], ([url, t]) =>
           fetcherWithToken(url, t),

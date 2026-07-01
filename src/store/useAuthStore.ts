@@ -11,8 +11,8 @@ interface useAuthStoreProps {
   isCheckingToken: boolean;
 
   setToken: (token: string, rememberMe: boolean) => void;
-  setAdmin: (isAdmin: boolean) => void; // Changed parameter type to boolean
-  setValidUntil: (validUntil: string) => void;
+  setAdmin: (isAdmin: boolean, rememberMe?: boolean) => void; // Changed parameter type to boolean
+  setValidUntil: (validUntil: string, rememberMe?: boolean) => void;
 
   clearToken: () => void;
   clearAdmin: () => void;
@@ -47,14 +47,22 @@ const useAuthStore = create<useAuthStoreProps>((set, get) => {
       }
     },
 
-    setAdmin: (isAdmin: boolean) => {
+    setAdmin: (isAdmin: boolean, rememberMe?: boolean) => {
       set({ isAdmin });
-      Cookies.set("isAdmin", isAdmin.toString(), { expires: 7 });
+      if (rememberMe) {
+        Cookies.set("isAdmin", isAdmin.toString(), { expires: 30 });
+      } else {
+        Cookies.set("isAdmin", isAdmin.toString());
+      }
     },
 
-    setValidUntil: (validUntil: string) => {
+    setValidUntil: (validUntil: string, rememberMe?: boolean) => {
       set({ validUntil });
-      Cookies.set("validUntil", validUntil, { expires: 7 });
+      if (rememberMe) {
+        Cookies.set("validUntil", validUntil, { expires: 30 });
+      } else {
+        Cookies.set("validUntil", validUntil);
+      }
     },
 
     clearToken: () => {
