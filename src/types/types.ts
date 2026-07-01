@@ -30,6 +30,17 @@ export const getStatusLabel = (status: string): string => {
   return MemberStatusLabels[status as MemberStatus] || status;
 };
 
+export interface MemberOtherInfo {
+  affiliation_with_mmu?: string;
+  faculty?: string;
+  year_joined?: string;
+  from_where?: string;
+  hacking_strengths?: string;
+  hacking_interests?: string;
+  why_joined?: string;
+  instagram_handle?: string;
+}
+
 export interface Member {
   id: number;
   name: string;
@@ -47,7 +58,9 @@ export interface Member {
   duration_active: string;
   avg_time_between_talks: string;
   meetups_since_last_talk: number;
+  other_info?: MemberOtherInfo;
 }
+
 
 export interface Token {
   id: number;

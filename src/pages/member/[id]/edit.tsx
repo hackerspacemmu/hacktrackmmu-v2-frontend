@@ -29,6 +29,16 @@ export default function EditMemberPage() {
     status: "" as MemberStatus | "",
     comment: "",
     contact_number: "",
+    other_info: {
+      affiliation_with_mmu: "",
+      faculty: "",
+      year_joined: "",
+      from_where: "",
+      hacking_strengths: "",
+      hacking_interests: "",
+      why_joined: "",
+      instagram_handle: "",
+    },
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +52,16 @@ export default function EditMemberPage() {
         status: member.status || "",
         comment: member.comment || "",
         contact_number: member.contact_number || "",
+        other_info: {
+          affiliation_with_mmu: member.other_info?.affiliation_with_mmu || "",
+          faculty: member.other_info?.faculty || "",
+          year_joined: member.other_info?.year_joined || "",
+          from_where: member.other_info?.from_where || "",
+          hacking_strengths: member.other_info?.hacking_strengths || "",
+          hacking_interests: member.other_info?.hacking_interests || "",
+          why_joined: member.other_info?.why_joined || "",
+          instagram_handle: member.other_info?.instagram_handle || "",
+        },
       });
     }
   }, [member]);
@@ -53,6 +73,21 @@ export default function EditMemberPage() {
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleOtherInfoChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      other_info: {
+        ...prev.other_info,
+        [name]: value,
+      },
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -224,6 +259,132 @@ export default function EditMemberPage() {
                 rows={4}
                 className="w-full px-3 py-2 border-2 dark:border border-neutral-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-[#333]"
               />
+            </div>
+
+            <div className="border-t border-neutral-300 dark:border-gray-700 pt-4 mt-6">
+              <h3 className="text-lg font-bold mb-4">Other Information</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="affiliation_with_mmu" className="block text-sm font-medium mb-1">
+                    Affiliation with MMU
+                  </label>
+                  <input
+                    type="text"
+                    id="affiliation_with_mmu"
+                    name="affiliation_with_mmu"
+                    value={formData.other_info.affiliation_with_mmu}
+                    onChange={handleOtherInfoChange}
+                    placeholder="e.g. Student, Alumni, Staff, External"
+                    className="w-full px-3 py-2 border-2 dark:border border-neutral-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-[#333]"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="faculty" className="block text-sm font-medium mb-1">
+                    Faculty
+                  </label>
+                  <input
+                    type="text"
+                    id="faculty"
+                    name="faculty"
+                    value={formData.other_info.faculty}
+                    onChange={handleOtherInfoChange}
+                    placeholder="e.g. FCI, FOE, FOB"
+                    className="w-full px-3 py-2 border-2 dark:border border-neutral-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-[#333]"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="year_joined" className="block text-sm font-medium mb-1">
+                    Year Joined MMU
+                  </label>
+                  <input
+                    type="text"
+                    id="year_joined"
+                    name="year_joined"
+                    value={formData.other_info.year_joined}
+                    onChange={handleOtherInfoChange}
+                    placeholder="e.g. 2023"
+                    className="w-full px-3 py-2 border-2 dark:border border-neutral-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-[#333]"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="from_where" className="block text-sm font-medium mb-1">
+                    Where did you hear about us?
+                  </label>
+                  <input
+                    type="text"
+                    id="from_where"
+                    name="from_where"
+                    value={formData.other_info.from_where}
+                    onChange={handleOtherInfoChange}
+                    placeholder="e.g. Friend, Discord, Instagram"
+                    className="w-full px-3 py-2 border-2 dark:border border-neutral-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-[#333]"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="hacking_strengths" className="block text-sm font-medium mb-1">
+                    Hacking Strengths
+                  </label>
+                  <textarea
+                    id="hacking_strengths"
+                    name="hacking_strengths"
+                    value={formData.other_info.hacking_strengths}
+                    onChange={handleOtherInfoChange}
+                    rows={2}
+                    placeholder="e.g. Frontend development, Python, Cybersecurity"
+                    className="w-full px-3 py-2 border-2 dark:border border-neutral-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-[#333]"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="hacking_interests" className="block text-sm font-medium mb-1">
+                    Hacking Interests
+                  </label>
+                  <textarea
+                    id="hacking_interests"
+                    name="hacking_interests"
+                    value={formData.other_info.hacking_interests}
+                    onChange={handleOtherInfoChange}
+                    rows={2}
+                    placeholder="e.g. AI/ML, Reverse Engineering, Blockchain"
+                    className="w-full px-3 py-2 border-2 dark:border border-neutral-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-[#333]"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="why_joined" className="block text-sm font-medium mb-1">
+                    Why Joined
+                  </label>
+                  <textarea
+                    id="why_joined"
+                    name="why_joined"
+                    value={formData.other_info.why_joined}
+                    onChange={handleOtherInfoChange}
+                    rows={2}
+                    placeholder="e.g. To meet like-minded people, learn coding"
+                    className="w-full px-3 py-2 border-2 dark:border border-neutral-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-[#333]"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="instagram_handle" className="block text-sm font-medium mb-1">
+                    Instagram Handle
+                  </label>
+                  <input
+                    type="text"
+                    id="instagram_handle"
+                    name="instagram_handle"
+                    value={formData.other_info.instagram_handle}
+                    onChange={handleOtherInfoChange}
+                    placeholder="e.g. username"
+                    className="w-full px-3 py-2 border-2 dark:border border-neutral-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-[#333]"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="flex flex-col gap-3">
