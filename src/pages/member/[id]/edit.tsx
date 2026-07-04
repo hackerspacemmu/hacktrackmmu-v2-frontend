@@ -36,8 +36,9 @@ export default function EditMemberPage() {
       from_where: "",
       hacking_strengths: "",
       hacking_interests: "",
-      why_joined: "",
+      why_join: "",
       instagram_handle: "",
+      project_to_be_worked_on: "",
     },
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -59,8 +60,9 @@ export default function EditMemberPage() {
           from_where: member.other_info?.from_where || "",
           hacking_strengths: member.other_info?.hacking_strengths || "",
           hacking_interests: member.other_info?.hacking_interests || "",
-          why_joined: member.other_info?.why_joined || "",
+          why_join: member.other_info?.why_join || "",
           instagram_handle: member.other_info?.instagram_handle || "",
+          project_to_be_worked_on: member.other_info?.project_to_be_worked_on || "",
         },
       });
     }
@@ -306,66 +308,6 @@ export default function EditMemberPage() {
                     value={formData.other_info.year_joined}
                     onChange={handleOtherInfoChange}
                     placeholder="e.g. 2023"
-                    className="w-full px-3 py-2 border-2 dark:border border-neutral-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-[#333]"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="from_where" className="block text-sm font-medium mb-1">
-                    Where did you hear about us?
-                  </label>
-                  <input
-                    type="text"
-                    id="from_where"
-                    name="from_where"
-                    value={formData.other_info.from_where}
-                    onChange={handleOtherInfoChange}
-                    placeholder="e.g. Friend, Discord, Instagram"
-                    className="w-full px-3 py-2 border-2 dark:border border-neutral-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-[#333]"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="hacking_strengths" className="block text-sm font-medium mb-1">
-                    Hacking Strengths
-                  </label>
-                  <textarea
-                    id="hacking_strengths"
-                    name="hacking_strengths"
-                    value={formData.other_info.hacking_strengths}
-                    onChange={handleOtherInfoChange}
-                    rows={2}
-                    placeholder="e.g. Frontend development, Python, Cybersecurity"
-                    className="w-full px-3 py-2 border-2 dark:border border-neutral-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-[#333]"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="hacking_interests" className="block text-sm font-medium mb-1">
-                    Hacking Interests
-                  </label>
-                  <textarea
-                    id="hacking_interests"
-                    name="hacking_interests"
-                    value={formData.other_info.hacking_interests}
-                    onChange={handleOtherInfoChange}
-                    rows={2}
-                    placeholder="e.g. AI/ML, Reverse Engineering, Blockchain"
-                    className="w-full px-3 py-2 border-2 dark:border border-neutral-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-[#333]"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="why_joined" className="block text-sm font-medium mb-1">
-                    Why Joined
-                  </label>
-                  <textarea
-                    id="why_joined"
-                    name="why_joined"
-                    value={formData.other_info.why_joined}
-                    onChange={handleOtherInfoChange}
-                    rows={2}
-                    placeholder="e.g. To meet like-minded people, learn coding"
                     className="w-full px-3 py-2 border-2 dark:border border-neutral-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-[#333]"
                   />
                 </div>

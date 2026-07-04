@@ -37,8 +37,9 @@ export interface MemberOtherInfo {
   from_where?: string;
   hacking_strengths?: string;
   hacking_interests?: string;
-  why_joined?: string;
+  why_join?: string;
   instagram_handle?: string;
+  project_to_be_worked_on?: string;
 }
 
 export interface Member {

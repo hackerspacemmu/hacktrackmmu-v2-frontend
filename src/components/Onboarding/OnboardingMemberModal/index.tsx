@@ -299,36 +299,40 @@ export function OnboardingMemberModal({
             {dayjs(member.created_at).format("HH:mm")}
           </p>
           <p>
-            <span className="font-semibold text-gray-400">Affiliation with MMU:</span>{" "}
+            <span className="font-semibold text-black dark:text-white">Affiliation with MMU:</span>{" "}
             {member.other_info?.affiliation_with_mmu || <NullTextIndicator />}
           </p>
           <p>
-            <span className="font-semibold text-gray-400">Faculty:</span>{" "}
+            <span className="font-semibold text-black dark:text-white">Faculty:</span>{" "}
             {member.other_info?.faculty || <NullTextIndicator />}
           </p>
           <p>
-            <span className="font-semibold text-gray-400">Year Joined MMU:</span>{" "}
+            <span className="font-semibold text-black dark:text-white">Year Joined MMU:</span>{" "}
             {member.other_info?.year_joined || <NullTextIndicator />}
           </p>
           <p>
-            <span className="font-semibold text-gray-400">From Where:</span>{" "}
+            <span className="font-semibold text-black dark:text-white">From Where:</span>{" "}
             {member.other_info?.from_where || <NullTextIndicator />}
           </p>
           <p>
-            <span className="font-semibold text-gray-400">Hacking Strengths:</span>{" "}
+            <span className="font-semibold text-black dark:text-white">Instagram Handle:</span>{" "}
+            {member.other_info?.instagram_handle || <NullTextIndicator />}
+          </p>
+          <p>
+            <span className="font-semibold text-black dark:text-white">Hacking Strengths:</span>{" "}
             {member.other_info?.hacking_strengths || <NullTextIndicator />}
           </p>
           <p>
-            <span className="font-semibold text-gray-400">Hacking Interests:</span>{" "}
+            <span className="font-semibold text-black dark:text-white">Hacking Interests:</span>{" "}
             {member.other_info?.hacking_interests || <NullTextIndicator />}
           </p>
           <p>
-            <span className="font-semibold text-gray-400">Why Joined:</span>{" "}
-            {member.other_info?.why_joined || <NullTextIndicator />}
+            <span className="font-semibold text-black dark:text-white">Why Joined:</span>{" "}
+            {member.other_info?.why_join || <NullTextIndicator />}
           </p>
           <p>
-            <span className="font-semibold text-gray-400">Instagram Handle:</span>{" "}
-            {member.other_info?.instagram_handle || <NullTextIndicator />}
+            <span className="font-semibold text-black dark:text-white">Project to be Worked On:</span>{" "}
+            {member.other_info?.project_to_be_worked_on || <NullTextIndicator />}
           </p>
         </div>
 
