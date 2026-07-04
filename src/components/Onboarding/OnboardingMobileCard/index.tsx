@@ -13,6 +13,8 @@ import { handleConfirmDeleteMember } from "../handleConfirmDeleteMember";
 interface OnboardingMobileCardProps {
   member: Member;
   mutateOnboarding: () => void;
+  onUpdateMemberLocal?: (updatedMember: Member) => void;
+  onDeleteMemberLocal?: (id: number) => void;
 }
 
 const ONBOARDING_STATUSES = [
@@ -31,6 +33,8 @@ const ONBOARDING_STATUSES = [
 export default function OnboardingMobileCard({
   member,
   mutateOnboarding,
+  onUpdateMemberLocal,
+  onDeleteMemberLocal,
 }: OnboardingMobileCardProps) {
   const { token } = useAuthStore();
   const { showToast } = useToast();
@@ -60,6 +64,7 @@ export default function OnboardingMobileCard({
         },
       );
       mutateOnboarding();
+      onUpdateMemberLocal?.({ ...member, status: newStatus });
       showToast("Member status updated successfully", "success");
     } catch (error) {
       console.error("Error updating status", error);
@@ -141,6 +146,8 @@ export default function OnboardingMobileCard({
         handleCloseModal={handleCloseModal}
         member={member}
         mutateOnboarding={mutateOnboarding}
+        onUpdateMemberLocal={onUpdateMemberLocal}
+        onDeleteMemberLocal={onDeleteMemberLocal}
       />
 
       <DeleteModal
@@ -154,6 +161,7 @@ export default function OnboardingMobileCard({
             showToast,
             handleCloseDeleteModal,
             setIsDeleting,
+            onDeleteMemberLocal,
           })
         }
         isDeleting={isDeleting}

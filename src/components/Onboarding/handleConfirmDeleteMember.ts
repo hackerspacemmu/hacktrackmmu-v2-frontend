@@ -8,6 +8,7 @@ interface HandleConfirmDeleteMemberParams {
   showToast: (message: string, type: "success" | "error") => void;
   handleCloseDeleteModal: () => void;
   setIsDeleting: (isDeleting: boolean) => void;
+  onDeleteMemberLocal?: (id: number) => void;
 }
 
 export const handleConfirmDeleteMember = async ({
@@ -17,6 +18,7 @@ export const handleConfirmDeleteMember = async ({
   showToast,
   handleCloseDeleteModal,
   setIsDeleting,
+  onDeleteMemberLocal,
 }: HandleConfirmDeleteMemberParams) => {
   setIsDeleting(true);
   try {
@@ -28,6 +30,7 @@ export const handleConfirmDeleteMember = async ({
     });
 
     mutateOnboarding();
+    onDeleteMemberLocal?.(memberId);
     showToast("Member deleted successfully", "success");
     handleCloseDeleteModal();
   } catch (error) {

@@ -27,6 +27,8 @@ interface OnboardingMemberModalProps {
   handleCloseModal: () => void;
   member: Member;
   mutateOnboarding: () => void;
+  onUpdateMemberLocal?: (updatedMember: Member) => void;
+  onDeleteMemberLocal?: (id: number) => void;
 }
 
 const convertToWhatsapp = (phoneNumber: string) => {
@@ -66,6 +68,8 @@ export function OnboardingMemberModal({
   handleCloseModal,
   member,
   mutateOnboarding,
+  onUpdateMemberLocal,
+  onDeleteMemberLocal,
 }: OnboardingMemberModalProps) {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -118,6 +122,7 @@ export function OnboardingMemberModal({
         },
       );
       mutateOnboarding();
+      onUpdateMemberLocal?.({ ...member, status: newStatus });
       showToast("Member status updated successfully", "success");
     } catch (error) {
       console.error("Error occurred during fetch", error);
@@ -355,6 +360,7 @@ export function OnboardingMemberModal({
             showToast,
             handleCloseDeleteModal,
             setIsDeleting,
+            onDeleteMemberLocal,
           })
         }
         isDeleting={isDeleting}
