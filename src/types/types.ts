@@ -55,6 +55,7 @@ export interface Member {
   register_date: Date;
   contact_number: string;
   discord_tag: string;
+  student_id?: string;
   progress_talk_num: number;
   duration_active: string;
   avg_time_between_talks: string;

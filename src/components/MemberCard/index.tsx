@@ -43,6 +43,7 @@ export default function MemberCard({
   meetups_since_last_talk,
   mutateMembers,
   other_info,
+  student_id,
 }: MemberCardProps) {
   const { token, isAdmin } = useAuthStore();
   const { showToast } = useToast();
@@ -425,6 +426,10 @@ export default function MemberCard({
 
             <h3 className="text-lg font-semibold mb-1 mt-4">Other Information</h3>
             <div className="border border-gray-700 py-3 px-4 rounded-md mb-4 max-h-48 overflow-y-auto flex flex-col gap-y-1.5 text-sm">
+              <p>
+                <span className="font-semibold text-black dark:text-white">Student ID:</span>{" "}
+                {student_id || <NullTextIndicator />}
+              </p>
               <p>
                 <span className="font-semibold text-black dark:text-white">Affiliation with MMU:</span>{" "}
                 {other_info?.affiliation_with_mmu || <NullTextIndicator />}
