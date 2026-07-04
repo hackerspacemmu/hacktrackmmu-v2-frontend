@@ -21,6 +21,8 @@ const truncateComment = (comment: string): string => {
 interface OnboardingTableRowProps {
   member: Member;
   mutateOnboarding: () => void;
+  onUpdateMemberLocal?: (updatedMember: Member) => void;
+  onDeleteMemberLocal?: (id: number) => void;
 }
 
 const statusColour: Partial<Record<MemberStatus, string>> = {
@@ -53,6 +55,8 @@ const ONBOARDING_STATUSES = [
 export default function OnboardingTableRow({
   member,
   mutateOnboarding,
+  onUpdateMemberLocal,
+  onDeleteMemberLocal,
 }: OnboardingTableRowProps) {
   const { token } = useAuthStore();
   const { showToast } = useToast();
@@ -88,6 +92,7 @@ export default function OnboardingTableRow({
         },
       );
       mutateOnboarding();
+      onUpdateMemberLocal?.({ ...member, comment: commentDraft });
       showToast("Comment updated successfully", "success");
       setIsCommentModalOpen(false);
     } catch (error) {
@@ -118,6 +123,7 @@ export default function OnboardingTableRow({
         },
       );
       mutateOnboarding();
+      onUpdateMemberLocal?.({ ...member, status: newStatus });
       showToast("Member status updated successfully", "success");
     } catch (error) {
       console.error("Error updating status", error);
@@ -204,6 +210,8 @@ export default function OnboardingTableRow({
         handleCloseModal={handleCloseModal}
         member={member}
         mutateOnboarding={mutateOnboarding}
+        onUpdateMemberLocal={onUpdateMemberLocal}
+        onDeleteMemberLocal={onDeleteMemberLocal}
       />
 
       <ModalLayout isOpen={isCommentModalOpen} onClose={() => setIsCommentModalOpen(false)}>
@@ -245,6 +253,7 @@ export default function OnboardingTableRow({
             showToast,
             handleCloseDeleteModal,
             setIsDeleting,
+            onDeleteMemberLocal,
           })
         }
         isDeleting={isDeleting}

@@ -39,6 +39,17 @@ export default function Onboarding() {
   const [isClient, setIsClient] = useState(false);
   const [searchResults, setSearchResults] = useState<Member[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  
+  const handleUpdateMemberLocal = (updatedMember: Member) => {
+    setSearchResults((prev) =>
+      prev.map((m) => (m.id === updatedMember.id ? updatedMember : m))
+    );
+  };
+
+  const handleDeleteMemberLocal = (memberId: number) => {
+    setSearchResults((prev) => prev.filter((m) => m.id !== memberId));
+  };
+
   const isMaxWidth768px = useMediaQuery("(max-width: 768px)");
   const [paginationNumber, setPaginationNumber] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string[]>(ONBOARDING_STATUSES);
@@ -184,6 +195,8 @@ export default function Onboarding() {
                     <OnboardingTableRow
                       member={member}
                       mutateOnboarding={mutateOnboarding}
+                      onUpdateMemberLocal={handleUpdateMemberLocal}
+                      onDeleteMemberLocal={handleDeleteMemberLocal}
                     />
                   </tr>
                 ))
@@ -204,6 +217,8 @@ export default function Onboarding() {
                   key={member.id}
                   member={member}
                   mutateOnboarding={mutateOnboarding}
+                  onUpdateMemberLocal={handleUpdateMemberLocal}
+                  onDeleteMemberLocal={handleDeleteMemberLocal}
                 />
               ))
             ) : (

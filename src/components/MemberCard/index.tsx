@@ -25,6 +25,7 @@ import Head from "next/head";
 import { useToast } from "@/components/Toast/ToastProvider";
 import { EditProjectForm, EditProjectData } from "../Forms/EditProjectForm";
 import { EditUpdateForm, EditUpdateData } from "../Forms/EditUpdateForm";
+import { NullTextIndicator } from "@/components/atomComponents/NullTextIndicator";
 
 interface MemberCardProps extends Member {
   mutateMembers?: () => void;
@@ -41,6 +42,7 @@ export default function MemberCard({
   avg_time_between_talks,
   meetups_since_last_talk,
   mutateMembers,
+  other_info,
 }: MemberCardProps) {
   const { token, isAdmin } = useAuthStore();
   const { showToast } = useToast();
@@ -419,6 +421,46 @@ export default function MemberCard({
                   <CircleAlert size="18" /> No updates made
                 </p>
               )}
+            </div>
+
+            <h3 className="text-lg font-semibold mb-1 mt-4">Other Information</h3>
+            <div className="border border-gray-700 py-3 px-4 rounded-md mb-4 max-h-48 overflow-y-auto flex flex-col gap-y-1.5 text-sm">
+              <p>
+                <span className="font-semibold text-black dark:text-white">Affiliation with MMU:</span>{" "}
+                {other_info?.affiliation_with_mmu || <NullTextIndicator />}
+              </p>
+              <p>
+                <span className="font-semibold text-black dark:text-white">Faculty:</span>{" "}
+                {other_info?.faculty || <NullTextIndicator />}
+              </p>
+              <p>
+                <span className="font-semibold text-black dark:text-white">Year Joined MMU:</span>{" "}
+                {other_info?.year_joined || <NullTextIndicator />}
+              </p>
+              <p>
+                <span className="font-semibold text-black dark:text-white">From Where:</span>{" "}
+                {other_info?.from_where || <NullTextIndicator />}
+              </p>
+              <p>
+                <span className="font-semibold text-black dark:text-white">Instagram Handle:</span>{" "}
+                {other_info?.instagram_handle || <NullTextIndicator />}
+              </p>
+              <p>
+                <span className="font-semibold text-black dark:text-white">Hacking Strengths:</span>{" "}
+                {other_info?.hacking_strengths || <NullTextIndicator />}
+              </p>
+              <p>
+                <span className="font-semibold text-black dark:text-white">Hacking Interests:</span>{" "}
+                {other_info?.hacking_interests || <NullTextIndicator />}
+              </p>
+              <p>
+                <span className="font-semibold text-black dark:text-white">Why Joined:</span>{" "}
+                {other_info?.why_join || <NullTextIndicator />}
+              </p>
+              <p>
+                <span className="font-semibold text-black dark:text-white">Project to be Worked On:</span>{" "}
+                {other_info?.project_to_be_worked_on || <NullTextIndicator />}
+              </p>
             </div>
 
             <button

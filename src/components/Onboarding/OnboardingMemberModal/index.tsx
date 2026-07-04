@@ -27,6 +27,8 @@ interface OnboardingMemberModalProps {
   handleCloseModal: () => void;
   member: Member;
   mutateOnboarding: () => void;
+  onUpdateMemberLocal?: (updatedMember: Member) => void;
+  onDeleteMemberLocal?: (id: number) => void;
 }
 
 const convertToWhatsapp = (phoneNumber: string) => {
@@ -66,6 +68,8 @@ export function OnboardingMemberModal({
   handleCloseModal,
   member,
   mutateOnboarding,
+  onUpdateMemberLocal,
+  onDeleteMemberLocal,
 }: OnboardingMemberModalProps) {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -118,6 +122,7 @@ export function OnboardingMemberModal({
         },
       );
       mutateOnboarding();
+      onUpdateMemberLocal?.({ ...member, status: newStatus });
       showToast("Member status updated successfully", "success");
     } catch (error) {
       console.error("Error occurred during fetch", error);
@@ -289,7 +294,7 @@ export function OnboardingMemberModal({
         </div>
 
         <h3 className="text-lg font-semibold mb-1 mt-4">Other Information</h3>
-        <div className="flex flex-col gap-x-2 border border-gray-700 py-3 px-4 rounded-md max-h-36 lg:max-h-48 overflow-y-auto">
+        <div className="flex flex-col gap-y-1.5 border border-gray-700 py-3 px-4 rounded-md max-h-48 overflow-y-auto text-sm">
           <p>
             <span className="font-semibold">Register Date:</span>{" "}
             {dayjs(member.created_at).format("DD/MM/YYYY")}
@@ -297,6 +302,42 @@ export function OnboardingMemberModal({
           <p>
             <span className="font-semibold">Register Time:</span>{" "}
             {dayjs(member.created_at).format("HH:mm")}
+          </p>
+          <p>
+            <span className="font-semibold text-black dark:text-white">Affiliation with MMU:</span>{" "}
+            {member.other_info?.affiliation_with_mmu || <NullTextIndicator />}
+          </p>
+          <p>
+            <span className="font-semibold text-black dark:text-white">Faculty:</span>{" "}
+            {member.other_info?.faculty || <NullTextIndicator />}
+          </p>
+          <p>
+            <span className="font-semibold text-black dark:text-white">Year Joined MMU:</span>{" "}
+            {member.other_info?.year_joined || <NullTextIndicator />}
+          </p>
+          <p>
+            <span className="font-semibold text-black dark:text-white">From Where:</span>{" "}
+            {member.other_info?.from_where || <NullTextIndicator />}
+          </p>
+          <p>
+            <span className="font-semibold text-black dark:text-white">Instagram Handle:</span>{" "}
+            {member.other_info?.instagram_handle || <NullTextIndicator />}
+          </p>
+          <p>
+            <span className="font-semibold text-black dark:text-white">Hacking Strengths:</span>{" "}
+            {member.other_info?.hacking_strengths || <NullTextIndicator />}
+          </p>
+          <p>
+            <span className="font-semibold text-black dark:text-white">Hacking Interests:</span>{" "}
+            {member.other_info?.hacking_interests || <NullTextIndicator />}
+          </p>
+          <p>
+            <span className="font-semibold text-black dark:text-white">Why Joined:</span>{" "}
+            {member.other_info?.why_join || <NullTextIndicator />}
+          </p>
+          <p>
+            <span className="font-semibold text-black dark:text-white">Project to be Worked On:</span>{" "}
+            {member.other_info?.project_to_be_worked_on || <NullTextIndicator />}
           </p>
         </div>
 
@@ -319,6 +360,7 @@ export function OnboardingMemberModal({
             showToast,
             handleCloseDeleteModal,
             setIsDeleting,
+            onDeleteMemberLocal,
           })
         }
         isDeleting={isDeleting}
