@@ -25,6 +25,7 @@ export default function EditMemberPage() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    student_id: "",
     discord_tag: "",
     status: "" as MemberStatus | "",
     comment: "",
@@ -49,6 +50,7 @@ export default function EditMemberPage() {
       setFormData({
         name: member.name || "",
         email: member.email || "",
+        student_id: member.student_id || "",
         discord_tag: member.discord_tag || "",
         status: member.status || "",
         comment: member.comment || "",
@@ -184,6 +186,21 @@ export default function EditMemberPage() {
                 value={formData.email}
                 onChange={handleChange}
                 required
+                className="w-full px-3 py-2 border-2 dark:border border-neutral-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-[#333]"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="student_id" className="block text-sm font-medium mb-1">
+                Student ID
+              </label>
+              <input
+                type="text"
+                id="student_id"
+                name="student_id"
+                value={formData.student_id}
+                onChange={handleChange}
+                placeholder="e.g. 1211101234"
                 className="w-full px-3 py-2 border-2 dark:border border-neutral-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-[#333]"
               />
             </div>

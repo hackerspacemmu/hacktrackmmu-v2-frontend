@@ -304,6 +304,10 @@ export function OnboardingMemberModal({
             {dayjs(member.created_at).format("HH:mm")}
           </p>
           <p>
+            <span className="font-semibold text-black dark:text-white">Student ID:</span>{" "}
+            {member.student_id || <NullTextIndicator />}
+          </p>
+          <p>
             <span className="font-semibold text-black dark:text-white">Affiliation with MMU:</span>{" "}
             {member.other_info?.affiliation_with_mmu || <NullTextIndicator />}
           </p>
