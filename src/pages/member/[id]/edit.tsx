@@ -271,15 +271,24 @@ export default function EditMemberPage() {
                   <label htmlFor="affiliation_with_mmu" className="block text-sm font-medium mb-1">
                     Affiliation with MMU
                   </label>
-                  <input
-                    type="text"
+                  <select
                     id="affiliation_with_mmu"
                     name="affiliation_with_mmu"
                     value={formData.other_info.affiliation_with_mmu}
                     onChange={handleOtherInfoChange}
-                    placeholder="e.g. Student, Alumni, Staff, External"
-                    className="w-full px-3 py-2 border-2 dark:border border-neutral-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-[#333]"
-                  />
+                    className="w-full px-3 py-2 border-2 dark:border border-neutral-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-[#333] text-black dark:text-white"
+                  >
+                    <option value="" disabled>Select Affiliation</option>
+                    <option value="Student">Student</option>
+                    <option value="Staff">Staff</option>
+                    <option value="Alumni">Alumni</option>
+                    {formData.other_info.affiliation_with_mmu &&
+                      !["Student", "Staff", "Alumni"].includes(formData.other_info.affiliation_with_mmu) && (
+                        <option value={formData.other_info.affiliation_with_mmu}>
+                          {formData.other_info.affiliation_with_mmu}
+                        </option>
+                      )}
+                  </select>
                 </div>
 
                 <div>
