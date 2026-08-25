@@ -107,6 +107,11 @@ export enum MeetupCategory {
   OffRecordMeetup = "off_record_meetup",
 }
 
+export interface ProjectMember {
+  id: number;
+  name: string;
+}
+
 export interface Project {
   id: number;
   name: string;

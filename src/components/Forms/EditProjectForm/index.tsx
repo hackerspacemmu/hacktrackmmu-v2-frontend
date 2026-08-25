@@ -1,16 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import useAuthStore from "@/store/useAuthStore";
 import { fetcherWithToken } from "@/utils/fetcher";
 import { apiUrl } from "@/utils/env";
-import { Project, Member } from "@/types/types";
-import { SearchableDropdown } from "@/components/atomComponents/Dropdown/SelectDropdown";
+import { Project, ProjectMember, Member } from "@/types/types";
+import { MultiSelectDropdown } from "@/components/atomComponents/Dropdown/MultiSelectDropdown";
 
 export interface EditProjectData {
   name: string;
   completed: boolean;
   category: string;
-  memberId: string | number;
+  memberIds: string[];
 }
 
 interface EditProjectFormProps {
@@ -42,7 +42,22 @@ export function EditProjectForm({
         : "project";
 
   const [category, setCategory] = useState<string>(initialCategory);
-  const [memberId, setMemberId] = useState<string | number>(defaultMemberId);
+  const [memberIds, setMemberIds] = useState<string[]>([String(defaultMemberId)]);
+
+  // The member list the card was rendered from doesn't carry the project's
+  // roster, so load it and pre-fill with it - otherwise saving from one
+  // member's card would drop everyone else on a group project.
+  const { data: projectData } = useSWR(
+    token ? [`${apiUrl}/api/v1/projects/${project.id}`, token] : null,
+    ([url, token]: [string, string]) => fetcherWithToken(url, token),
+  );
+  const projectMembers: ProjectMember[] = projectData?.members ?? [];
+
+  useEffect(() => {
+    if (projectMembers.length > 0) {
+      setMemberIds(projectMembers.map((m) => String(m.id)));
+    }
+  }, [projectData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const {
     data: membersData,
@@ -55,13 +70,25 @@ export function EditProjectForm({
   const membersList = membersData?.data || membersData || [];
 
   const handleSave = () => {
-    onSave({ name, completed, category, memberId });
+    onSave({ name, completed, category, memberIds });
   };
 
-  const memberOptions = membersList.map((m: Member) => ({
-    id: String(m.id),
-    name: m.name,
-  }));
+  const fetchedOptions: { id: string; name: string }[] = membersList.map(
+    (m: Member) => ({
+      id: String(m.id),
+      name: m.name,
+    }),
+  );
+
+  // Keep the project's current members visible as tags even before the member
+  // list finishes loading, or if one of them is missing from it.
+  const fetchedIds = new Set(fetchedOptions.map((o) => o.id));
+  const memberOptions = [
+    ...fetchedOptions,
+    ...projectMembers
+      .filter((m) => !fetchedIds.has(String(m.id)))
+      .map((m) => ({ id: String(m.id), name: m.name })),
+  ];
 
   return (
     <>
@@ -117,12 +144,12 @@ export function EditProjectForm({
           </div>
         </div>
 
-        <div className="grid grid-cols-[100px_1fr] items-center">
-          <label className="font-semibold text-sm">Owner</label>
+        <div className="grid grid-cols-[100px_1fr] items-start">
+          <label className="font-semibold text-sm pt-4">Members</label>
           <div className="w-full">
-            <SearchableDropdown
-              id={`project-owner-${project.id}`}
-              name="owner"
+            <MultiSelectDropdown
+              id={`project-members-${project.id}`}
+              name="members"
               label=""
               placeholder={
                 membersLoading
@@ -132,8 +159,8 @@ export function EditProjectForm({
                     : "Search and select..."
               }
               options={memberOptions}
-              value={String(memberId)}
-              onChange={(val) => setMemberId(val)}
+              selectedValues={memberIds}
+              onChange={setMemberIds}
             />
           </div>
         </div>
@@ -162,7 +189,7 @@ export function EditProjectForm({
         </button>
         <button
           onClick={handleSave}
-          disabled={isSaving || name.trim() === ""}
+          disabled={isSaving || name.trim() === "" || memberIds.length === 0}
           className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition duration-200 disabled:bg-blue-400 disabled:cursor-not-allowed"
         >
           {isSaving ? "Saving..." : "Save"}

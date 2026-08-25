@@ -140,7 +140,7 @@ export default function MemberCard({
             name: data.name,
             completed: data.completed,
             category: data.category,
-            member_ids: [data.memberId],
+            member_ids: data.memberIds,
           },
         },
         {
