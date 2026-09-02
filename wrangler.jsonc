@@ -13,5 +13,8 @@
   },
   "cache": {
     "enabled": true
+  },
+  "observability": {
+    "enabled": false
   }
 }
