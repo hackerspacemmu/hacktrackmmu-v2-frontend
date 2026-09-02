@@ -6,7 +6,6 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import useAuthStore from "@/store/useAuthStore";
 import { useToast } from "@/components/Toast/ToastProvider";
-import { setTimeout } from "timers";
 
 const hankenGrotesk = Hanken_Grotesk({
   subsets: ["latin"],

@@ -51,7 +51,7 @@ export default function BackgroundPaths({
         src="/hacktrack_landing_image.jpg"
         alt="Hacktrack MMU background"
         fill
-        priority
+        loading="lazy"
         className="object-cover object-center"
       />
 
