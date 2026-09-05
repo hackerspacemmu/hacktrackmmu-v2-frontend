@@ -95,13 +95,15 @@ jobs:
             echo
             echo "_This version is not serving production traffic. Merging to \`main\` deploys it._"
           } > comment.md
+          jq -n --rawfile body comment.md '{body: $body}' > payload.json
 
-          existing=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
-            -f per_page=100 \
+          # `gh api` silently promotes a request to POST when -f/-F fields are
+          # present, so the lookup passes no fields and keeps per_page in the URL.
+          existing=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments?per_page=100" \
             --jq "map(select(.body | startswith(\"$marker\"))) | .[0].id // empty")
 
           if [ -n "$existing" ]; then
-            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" -F body=@comment.md >/dev/null
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" --input payload.json >/dev/null
           else
-            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -F body=@comment.md >/dev/null
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --input payload.json >/dev/null
           fi
