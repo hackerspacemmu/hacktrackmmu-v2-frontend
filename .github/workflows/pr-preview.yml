@@ -1,0 +1,109 @@
+name: PR preview
+
+on:
+  pull_request:
+    branches: [main]
+
+# One preview build per PR; a new push supersedes the one still running.
+concurrency:
+  group: cloudflare-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  preview:
+    name: Build and upload preview version
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      # NEXT_PUBLIC_* values are inlined into the client bundle at build time.
+      # Forked PRs get no secrets, so they build (and are still typechecked)
+      # with empty values and skip the upload steps below.
+      - name: Build
+        run: npx vinext build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_ADMIN_PASSWORD: ${{ secrets.NEXT_PUBLIC_ADMIN_PASSWORD }}
+          NEXT_PUBLIC_MEMBER_PASSWORD: ${{ secrets.NEXT_PUBLIC_MEMBER_PASSWORD }}
+
+      # Uploads a new Worker version without shifting production traffic onto
+      # it, and pins it to a stable per-PR alias URL.
+      - name: Upload preview version
+        id: preview
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          alias="pr-${PR_NUMBER}"
+          npx wrangler versions upload \
+            --config dist/hacktrackmmu_frontend_v2/wrangler.json \
+            --preview-alias "$alias" \
+            --tag "$alias" \
+            --message "PR #${PR_NUMBER} @ ${HEAD_SHA:0:7}" \
+            2>&1 | tee upload.log
+
+          urls=$(grep -oE 'https://[A-Za-z0-9._-]+\.workers\.dev' upload.log || true)
+          url=$(printf '%s\n' "$urls" | grep "^https://${alias}-" | head -1 || true)
+          [ -n "$url" ] || url=$(printf '%s\n' "$urls" | tail -1)
+          version=$(grep -oiE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' upload.log | head -1 || true)
+
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Comment preview URL
+        if: steps.preview.outcome == 'success' && steps.preview.outputs.url != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PREVIEW_URL: ${{ steps.preview.outputs.url }}
+          VERSION_ID: ${{ steps.preview.outputs.version }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          marker='<!-- cloudflare-preview -->'
+          {
+            echo "$marker"
+            echo "### Cloudflare preview"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| **Preview URL** | $PREVIEW_URL |"
+            echo "| **Version** | \`${VERSION_ID:-unknown}\` |"
+            echo "| **Commit** | \`${HEAD_SHA:0:7}\` |"
+            echo
+            echo "_This version is not serving production traffic. Merging to \`main\` deploys it._"
+          } > comment.md
+          jq -n --rawfile body comment.md '{body: $body}' > payload.json
+
+          # `gh api` silently promotes a request to POST when -f/-F fields are
+          # present, so the lookup passes no fields and keeps per_page in the URL.
+          existing=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments?per_page=100" \
+            --jq "map(select(.body | startswith(\"$marker\"))) | .[0].id // empty")
+
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" --input payload.json >/dev/null
+          else
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --input payload.json >/dev/null
+          fi
