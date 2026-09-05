@@ -11,6 +11,8 @@
     "not_found_handling": "none",
     "binding": "ASSETS"
   },
+  // Enables versioned + per-PR aliased preview URLs (see .github/workflows/pr-preview.yml).
+  "preview_urls": true,
   "cache": {
     "enabled": true
   },
