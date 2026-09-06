@@ -6,6 +6,74 @@ HackTrack MMU is a Next.js (pages router) admin/member-tracking app for a univer
 
 Routes: /login (password box #password, show/hide eye icon, Remember me checkbox, submit, 4-image carousel rotating every 5s), /dashboard (SWR-backed Meetups/Hackathons/Active Members sections with skeleton loading; admin-only Control Panel with New Meetup / New Project / New Update buttons — NOTE: a "New Member" action component exists in source (NewMemberActionButton) but is never rendered anywhere in the app; this is effectively dead/unwired code and there is no way to create a member from the UI), /members (search with 300ms debounce, Filter popover with Status + Sort By selects, paginated member cards, click-to-open detail modal with Projects/Talks lists and admin-only inline Edit/Delete), /meetups (paginated Regular Meetups + Hackathons grids, click-to-open detail modal, admin-only Edit Meetup/Delete Meetup and per-update edit/delete), /onboarding (desktop table / mobile card list depending on viewport <=768px, Filter popover, inline status-change dropdown, View/Edit/Delete per row) — IMPORTANT FINDING: unlike every other admin surface, the Onboarding PAGE itself performs no isAdmin check; a logged-in viewer whose nav link is hidden can still open /onboarding directly by URL and sees the full table including status dropdown and View/Edit/Delete controls (client-side only; server-side enforcement is unverified), /member/[id]/edit (pre-filled form incl. nested "Other Information"; Name and Email are native-required so submitting blank ones is silently blocked by the browser, no custom validation message) — IMPORTANT FINDING: GET /api/v1/members/:id for a non-existent id (e.g. 999999) returns HTTP 200 with a null body rather than 404, so the edit page silently renders a completely blank form with no error message instead of the app's usual "Error occurred" state. Dark mode is driven purely by the OS/browser `prefers-color-scheme` media query (useDarkMode hook) — there is no in-app toggle button, so it must be tested via emulated color-scheme rather than a UI control. Below the `lg` breakpoint the top nav collapses to a hamburger button that opens a slide-in Sidebar with an overlay, mirroring the desktop links (Onboarding link and "Admin Mode" label only for admins).
 
+## Test Data & Isolation
+
+**Mandatory for every scenario in sections 3 onward.** Section 2 (Dashboard) already
+implements this — see `tests/support/api.ts` plus the `afterEach` blocks in the three
+happy-path specs for a working reference.
+
+### The rule
+
+A test must never mutate a record it did not create. Any scenario that creates, edits,
+promotes, demotes or deletes data must:
+
+1. **Create its own fixture** through the REST API before the UI steps run.
+2. **Delete that fixture in `test.afterEach`**, so the database is byte-identical before
+   and after the run.
+
+This is what makes `fullyParallel: true` safe. Two failures already observed in section 2
+motivate it:
+
+- Tests sharing mutable seeded records interleave and corrupt each other. Two specs both
+  selected the alphabetically-first member; one spec's teardown deleted a project while the
+  other was mid-submit, producing a 422 "Member and project mismatch".
+- Mutating shared seed data compounds. The New Meetup flow permanently promotes a member
+  out of the finite "Yet To Host" pool; run uncleaned it drained that pool from 12 to 0 and
+  the host dropdown stopped rendering its grouping at all.
+
+Read-only scenarios (listing, filtering, sorting, pagination, searching for a nonexistent
+value, responsive layout, nav visibility, API-failure interception) need no fixture. They
+are identified below by the absence of a **Fixture:** line.
+
+### Never select shared data by position
+
+Do not take `.first()` from a members/projects/meetups dropdown or card grid and then mutate
+it — another worker's fixture can occupy that slot, or disappear from it mid-test. Select
+the fixture you created, by its unique tag.
+
+### API constraints on fixtures (all verified against the running backend)
+
+- **No create endpoint returns an id.** `POST /api/v1/members`, `/meetups`, `/projects` and
+  `/updates` return only a message (members additionally return `uuid` = `spreadsheet_id`).
+  Teardown must look the record up by a unique tag chosen at creation time.
+- **Lookup routes:** members via `GET /api/v1/members/search?query=<tag>`; projects via
+  `GET /api/v1/projects` (full list, match on `name`); meetups via
+  `GET /api/v1/dashboard/meetups` (recent) or `GET /api/v1/meetups/?page=N` (returns
+  `{data, meta}`). **`GET /api/v1/meetups/search?query=` does not match on meetup number** —
+  it returns `[]` for a number that exists.
+- **There is no `GET /api/v1/updates` index route.** An update can only be found nested
+  inside its meetup's payload, or by id via `show`.
+- **Cascades:** `Meetup has_many :updates, dependent: :destroy` and `Project has_many
+  :updates, dependent: :destroy`. Deleting a fixture meetup or project removes its updates;
+  an update attached to a *seeded* meetup must be deleted explicitly.
+- **`meetups.number` and `meetups.hackathon_number` are UNIQUE indexes.** Parallel workers
+  that each request "the next number" will collide. Fixture meetups must use a reserved high
+  range (e.g. `90000 + workerIndex * 100 + n`), never the app's next-number value.
+- **Member `status` enum:** `registered, contacted, duplicate, first_talk_given,
+  never_active, active, socially_active, was_active, was_socially_active, terminated`.
+  Create onboarding fixtures directly at the status the scenario needs rather than clicking
+  a real member through the stages.
+- **A fixture meetup surfaces at the top of the dashboard Meetups list** (that list is
+  ordered by recency and fixture numbers are high — verified: `[90001, 495, 494, ...]`).
+  Keep fixture lifetimes short, and do not assert exact global card counts in any test that
+  may run alongside them.
+
+### Teardown must not mask failures
+
+Cleanup runs in `afterEach` and must never throw — a teardown error would replace the real
+assertion failure with a confusing cleanup error. Log a warning instead; see `cleanUp()` in
+`tests/support/api.ts`.
+
 ## Test Scenarios
 
 ### 1. Authentication
@@ -164,7 +232,7 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
     - expect: POST /api/v1/meetups is called with the regular-meetup payload
     - expect: Toast 'Successfully added meetup!' appears immediately
     - expect: Modal closes and the new meetup card appears in the Meetups section
-    - expect: NOTE FOR TEST DATA: this test creates a real meetup record; if run against shared seed data, prefer running it against an isolated/test database or clean up via the corresponding delete-meetup flow afterward
+  **Cleanup:** IMPLEMENTED — the spec records the meetup number once the POST is confirmed and `afterEach` deletes it via `deleteMeetupByNumber()`, which also returns the host to 'Yet To Host' and rolls the next-number counter back.
 
 #### 2.4. New Meetup modal blocks submission without a host
 
@@ -223,7 +291,7 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
     - expect: POST /api/v1/projects fires with the project payload
     - expect: Toast 'Successfully added project!' appears immediately
     - expect: Modal closes
-    - expect: NOTE FOR TEST DATA: creates a real project attached to a real seeded member — clean up via that member's card delete-project action afterward if run against shared data
+  **Cleanup:** IMPLEMENTED — the project name is timestamped (`QA Test Project <ts>`) and `afterEach` deletes it via `deleteProjectByName()`.
 
 #### 2.9. New Update modal enforces sequential required-field validation (mislabeled Member error)
 
@@ -253,7 +321,7 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
     - expect: POST /api/v1/updates fires with the update payload
     - expect: Toast 'Successfully added updates!' appears immediately
     - expect: Modal closes
-    - expect: NOTE FOR TEST DATA: creates a real update record attached to seeded meetup/project/member
+  **Cleanup:** IMPLEMENTED — the description is timestamped and `afterEach` deletes it via `deleteUpdateByDescription()`. The update is deleted directly, not by cascade, because the meetup it attaches to is seed data that must survive.
 
 #### 2.11. Opening and cancelling each Control Panel modal makes no network mutation
 
@@ -284,6 +352,8 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 
 **Seed:** `seed.spec.ts`
 
+**Isolation:** Every mutating scenario below creates and deletes its own fixture — see [Test Data & Isolation](#test-data--isolation). Scenarios without a **Fixture:** line are read-only.
+
 #### 3.1. Members list loads with cards and pagination controls
 
 **File:** `tests/members/members-list-loads.spec.ts`
@@ -299,10 +369,14 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 
 **File:** `tests/members/members-search-returns-results.spec.ts`
 
+**Fixture:** A member created via `POST /api/v1/members` with a uniquely tagged name (e.g. `E2E Search Target <workerIndex>-<ts>`). Search for THAT name rather than the hardcoded 'Chong Wei Jie' below — a seeded member can be renamed, filtered out by status, or claimed by another worker, whereas a tagged fixture is guaranteed to exist and to match exactly one card.
+
+**Cleanup:** `afterEach` deletes the fixture member.
+
 **Steps:**
   1. Navigate to /login, log in as admin, go to /members
     - expect: Member cards loaded
-  2. Type a known seeded member's name (e.g. 'Chong Wei Jie') into the Search members input and wait ~500ms for the debounce
+  2. Type the fixture member's tagged name into the Search members input and wait ~500ms for the debounce
     - expect: GET /api/v1/members/search?query=... fires
     - expect: The grid now shows only matching card(s) for that name
     - expect: The bottom pagination control is hidden while searching
@@ -387,6 +461,10 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 
 **File:** `tests/members/members-edit-happy-path.spec.ts`
 
+**Fixture:** A member created via `POST /api/v1/members`. This scenario PATCHes a comment, so it must not touch seeded data — navigate to the fixture's own `/member/<id>/edit`.
+
+**Cleanup:** `afterEach` deletes the fixture member.
+
 **Steps:**
   1. Navigate to /login, log in as admin, go to /members, open a member's detail modal, click the Edit icon link
     - expect: Navigates to /member/<id>/edit with the form pre-filled from the member's current data
@@ -398,8 +476,12 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 
 **File:** `tests/members/members-edit-required-field-validation.spec.ts`
 
+**Fixture:** A member created via `POST /api/v1/members`, used in place of the `<known-id>` below. No PATCH should fire (native validation blocks it), but a fixture gives a stable id and guarantees that an unexpected save cannot damage real data.
+
+**Cleanup:** `afterEach` deletes the fixture member.
+
 **Steps:**
-  1. Navigate to /login, log in as admin, open a member's edit page directly via /member/<known-id>/edit
+  1. Navigate to /login, log in as admin, open the FIXTURE member's edit page directly via /member/<fixture-id>/edit
     - expect: Form pre-filled with existing Name and Email
   2. Select all text in the Name field and delete it, then click 'Save Changes'
     - expect: Browser's native required-field validation blocks submission (no PATCH request fires)
@@ -431,6 +513,8 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 
 **Seed:** `seed.spec.ts`
 
+**Isolation:** Every mutating scenario below creates and deletes its own fixture — see [Test Data & Isolation](#test-data--isolation). Scenarios without a **Fixture:** line are read-only.
+
 #### 4.1. Meetups page loads Regular Meetups and Hackathons sections
 
 **File:** `tests/meetups/meetups-list-loads.spec.ts`
@@ -458,10 +542,14 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 
 **File:** `tests/meetups/meetups-card-opens-detail-modal.spec.ts`
 
+**Fixture:** A meetup created via `POST /api/v1/meetups` using a reserved number (`90000 + workerIndex * 100 + n`, never the app's next-number value — that column is UNIQUE), plus one update attached to it via `POST /api/v1/updates`. This makes "a meetup card that has at least one update" deterministic instead of hunting the grid for one.
+
+**Cleanup:** `afterEach` deletes the fixture meetup; its update cascades away with it.
+
 **Steps:**
   1. Navigate to /login, log in as admin, go to /meetups
     - expect: Cards loaded
-  2. Click on a meetup card that has at least one update
+  2. Search for / locate the fixture meetup's card (it carries the reserved number) and click it
     - expect: Page title updates to include the meetup number
     - expect: Modal opens showing Host, Date, update count, an 'Updates' list with each update's description/category/author, and (as admin) 'Edit Meetup' and 'Delete Meetup' buttons plus per-update edit/delete icons
 
@@ -469,9 +557,13 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 
 **File:** `tests/meetups/meetups-edit-happy-path.spec.ts`
 
+**Fixture:** A meetup created via `POST /api/v1/meetups` with a reserved number. This scenario PATCHes number/host/date, so it must never edit a seeded meetup.
+
+**Cleanup:** `afterEach` deletes the fixture meetup.
+
 **Steps:**
-  1. Navigate to /login, log in as admin, open a meetup's detail modal, click 'Edit Meetup'
-    - expect: Form shows Number (spinbutton), a searchable Host dropdown, and a Date field pre-filled with current values
+  1. Navigate to /login, log in as admin, open the FIXTURE meetup's detail modal, click 'Edit Meetup'
+    - expect: Form shows Number (spinbutton), a searchable Host dropdown, and a Date field pre-filled with the fixture's current values
   2. Change the Date to a different valid date and click 'Save'
     - expect: PATCH /api/v1/meetups/<id> fires with the updated payload
     - expect: Toast 'Meetup edited successfully!' appears immediately
@@ -481,8 +573,12 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 
 **File:** `tests/meetups/meetups-edit-cancel-discards.spec.ts`
 
+**Fixture:** A meetup created via `POST /api/v1/meetups` with a reserved number. No PATCH is expected, but if Cancel ever fails to discard, only fixture data is affected.
+
+**Cleanup:** `afterEach` deletes the fixture meetup.
+
 **Steps:**
-  1. Navigate to /login, log in as admin, open a meetup's detail modal, click 'Edit Meetup'
+  1. Navigate to /login, log in as admin, open the FIXTURE meetup's detail modal, click 'Edit Meetup'
     - expect: Edit form shown with current values
   2. Change the Number field value, then click 'Cancel' instead of 'Save'
     - expect: No PATCH request fires
@@ -492,8 +588,12 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 
 **File:** `tests/meetups/meetups-delete-confirmation-cancel.spec.ts`
 
+**Fixture:** A meetup created via `POST /api/v1/meetups` with a reserved number. Essential here: the scenario opens a real delete confirmation, so if the dialog is ever accepted instead of dismissed, only a throwaway meetup is lost.
+
+**Cleanup:** `afterEach` deletes the fixture meetup, tolerating the case where the test already deleted it.
+
 **Steps:**
-  1. Navigate to /login, log in as admin, open a meetup's detail modal
+  1. Navigate to /login, log in as admin, open the FIXTURE meetup's detail modal
     - expect: 'Delete Meetup' button visible
   2. Click 'Delete Meetup'
     - expect: A native browser confirm() dialog appears with text mentioning associated updates will also be deleted
@@ -505,8 +605,12 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 
 **File:** `tests/meetups/meetups-edit-update-happy-path.spec.ts`
 
+**Fixture:** A meetup created with a reserved number plus one update attached to it. The scenario PATCHes the update's description, so the update must be one the test owns.
+
+**Cleanup:** `afterEach` deletes the fixture meetup; the update cascades.
+
 **Steps:**
-  1. Navigate to /login, log in as admin, open a meetup detail modal that has at least one update, click the edit icon on that update
+  1. Navigate to /login, log in as admin, open the FIXTURE meetup's detail modal (it has exactly one update), click the edit icon on that update
     - expect: Edit-update form shown with Category, Member/Project/Date dropdowns, and Description pre-filled
   2. Change the Description text and save
     - expect: PATCH /api/v1/updates/<id> fires
@@ -517,8 +621,12 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 
 **File:** `tests/meetups/meetups-delete-update-cancel.spec.ts`
 
+**Fixture:** A meetup created with a reserved number plus one update attached to it, so an accidentally confirmed dialog destroys only fixture data.
+
+**Cleanup:** `afterEach` deletes the fixture meetup; the update cascades.
+
 **Steps:**
-  1. Navigate to /login, log in as admin, open a meetup detail modal with at least one update
+  1. Navigate to /login, log in as admin, open the FIXTURE meetup's detail modal (it has exactly one update)
     - expect: Delete icon visible next to the update
   2. Click the delete icon for an update
     - expect: A native confirm() dialog appears asking to confirm deletion of the update
@@ -539,6 +647,8 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 ### 5. Onboarding
 
 **Seed:** `seed.spec.ts`
+
+**Isolation:** Every mutating scenario below creates and deletes its own fixture — see [Test Data & Isolation](#test-data--isolation). Scenarios without a **Fixture:** line are read-only.
 
 #### 5.1. Onboarding table loads on desktop viewport with default First-Talk-Given-and-earlier filter
 
@@ -564,10 +674,14 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 
 **File:** `tests/onboarding/onboarding-search-results.spec.ts`
 
+**Fixture:** A member created via `POST /api/v1/members` with a uniquely tagged name and an onboarding status (`registered`, `contacted` or `first_talk_given`) so it passes the page's default status filter. Search for that tag rather than an arbitrary seeded name.
+
+**Cleanup:** `afterEach` deletes the fixture member.
+
 **Steps:**
   1. Navigate to /login, log in as admin, go to /onboarding
     - expect: Rows loaded
-  2. Type a known onboarding member's name into the Search members box and wait for the debounce
+  2. Type the fixture member's tagged name into the Search members box and wait for the debounce
     - expect: Only matching row(s) remain, further narrowed by the current status filter client-side
     - expect: Pagination control is hidden while searching
 
@@ -597,18 +711,26 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 
 **File:** `tests/onboarding/onboarding-view-member-modal.spec.ts`
 
+**Fixture:** A member created via `POST /api/v1/members` with some fields deliberately populated and others left blank, so the modal's populated values AND its 'Not Provided' fallbacks can both be asserted against known input instead of whatever a seeded row happens to contain.
+
+**Cleanup:** `afterEach` deletes the fixture member.
+
 **Steps:**
   1. Navigate to /login, log in as admin, go to /onboarding
     - expect: Rows loaded
-  2. Click 'View' on any row
+  2. Search for the fixture member, then click 'View' on its row
     - expect: Modal opens showing the member's name, current Status heading, Contact Information (email/contact number/discord with copy-to-clipboard and mailto/WhatsApp links), Comment, and Other Information (Register Date/Time, Student ID, etc., each falling back to a 'Not Provided' indicator when empty)
 
 #### 5.7. Promoting onboarding status advances to the next stage
 
 **File:** `tests/onboarding/onboarding-promote-status.spec.ts`
 
+**Fixture:** A member created via `POST /api/v1/members` with `status: "registered"`. This scenario PUTs a status change — never promote a real onboarding member, and never hunt the list for one at the right stage, since another worker may be moving it concurrently.
+
+**Cleanup:** `afterEach` deletes the fixture member.
+
 **Steps:**
-  1. Navigate to /login, log in as admin, go to /onboarding, open the View modal for a member whose status is 'Registered' or 'Contacted'
+  1. Navigate to /login, log in as admin, go to /onboarding, search for the fixture member (status 'Registered') and open its View modal
     - expect: An enabled (blue) up-arrow 'Promote' button is visible
   2. Click the promote (up-arrow) button
     - expect: PUT /api/v1/members/<id> fires with the next status
@@ -619,8 +741,12 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 
 **File:** `tests/onboarding/onboarding-demote-status.spec.ts`
 
+**Fixture:** A member created via `POST /api/v1/members` with `status: "contacted"`, giving a deterministic starting stage to demote from.
+
+**Cleanup:** `afterEach` deletes the fixture member.
+
 **Steps:**
-  1. Navigate to /login, log in as admin, go to /onboarding, open the View modal for a member whose status is 'Contacted' or 'First Talk Given'
+  1. Navigate to /login, log in as admin, go to /onboarding, search for the fixture member (status 'Contacted') and open its View modal
     - expect: An enabled (yellow) down-arrow 'Demote' button is visible
   2. Click the demote (down-arrow) button
     - expect: PUT /api/v1/members/<id> fires with the previous status
@@ -631,8 +757,12 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 
 **File:** `tests/onboarding/onboarding-final-status-assign-tick.spec.ts`
 
+**Fixture:** A member created via `POST /api/v1/members` with `status: "first_talk_given"`, so the final-stage tick and the disabled promote arrow are guaranteed to render without depending on a seeded member sitting at that exact stage.
+
+**Cleanup:** `afterEach` deletes the fixture member.
+
 **Steps:**
-  1. Navigate to /login, log in as admin, go to /onboarding, open the View modal for a member whose status is 'First Talk Given'
+  1. Navigate to /login, log in as admin, go to /onboarding, search for the fixture member (status 'First Talk Given') and open its View modal
     - expect: A green checkmark button labeled 'Assign Status in Edit Page' is shown linking to /member/<id>/edit?source=onboarding
     - expect: The up-arrow (promote) is disabled/greyed since there is no further onboarding stage
     - expect: A banner reads 'Select Tick Icon to Assign Status in Edit Page.'
@@ -643,10 +773,14 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 
 **File:** `tests/onboarding/onboarding-delete-confirmation-cancel.spec.ts`
 
+**Fixture:** A member created via `POST /api/v1/members` with an onboarding status. Essential here: the scenario opens a real Delete Member dialog, so an accidentally confirmed delete must only ever destroy a throwaway record.
+
+**Cleanup:** `afterEach` deletes the fixture member, tolerating the case where the test already deleted it.
+
 **Steps:**
   1. Navigate to /login, log in as admin, go to /onboarding
     - expect: Rows loaded
-  2. Click 'Delete' on any row
+  2. Click 'Delete' on the fixture member's row
     - expect: A modal titled 'Delete Member' appears with the warning text "Doing so cannot be reversed!" and Cancel/Delete buttons
   3. Click 'Cancel'
     - expect: Modal closes
@@ -657,15 +791,21 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 
 **File:** `tests/onboarding/onboarding-edit-link-navigates.spec.ts`
 
+**Fixture:** A member created via `POST /api/v1/members` with an onboarding status, so the row clicked is one the test owns and the resulting `/member/<id>/edit?source=onboarding` URL can be asserted against a known id.
+
+**Cleanup:** `afterEach` deletes the fixture member.
+
 **Steps:**
   1. Navigate to /login, log in as admin, go to /onboarding
     - expect: Rows loaded
-  2. Click 'Edit' on any row
+  2. Click 'Edit' on the fixture member's row
     - expect: Navigates to /member/<id>/edit?source=onboarding with the member's form pre-filled
 
 ### 6. Navigation & Layout
 
 **Seed:** `seed.spec.ts`
+
+**Isolation:** Every scenario in this section is read-only (nav visibility, responsive breakpoints, colour scheme, routing), so none needs a fixture.
 
 #### 6.1. Desktop nav shows admin-only links and Admin Mode label for admin
 
@@ -739,6 +879,8 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 
 **Seed:** `seed.spec.ts`
 
+**Isolation:** Every mutating scenario below creates and deletes its own fixture — see [Test Data & Isolation](#test-data--isolation). Scenarios without a **Fixture:** line are read-only.
+
 #### 7.1. Unauthenticated access to a protected route redirects to login with a warning toast
 
 **File:** `tests/authorization/unauthenticated-redirect-to-login.spec.ts`
@@ -796,6 +938,10 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 
 **File:** `tests/authorization/viewer-can-access-onboarding-directly.spec.ts`
 
+**Fixture:** A member created via `POST /api/v1/members` with an onboarding status. The scenario's open question — whether the viewer's PUT/DELETE/PATCH calls are rejected server-side — can only be answered by actually issuing one, so it MUST be issued against this fixture and never against a real onboarding member.
+
+**Cleanup:** `afterEach` deletes the fixture member, tolerating the case where a probing DELETE succeeded.
+
 **Steps:**
   1. Navigate to /login, log in as viewer ('hacking things together')
     - expect: Nav bar does NOT show an 'Onboarding' link
@@ -807,8 +953,12 @@ Routes: /login (password box #password, show/hide eye icon, Remember me checkbox
 
 **File:** `tests/authorization/viewer-can-open-member-edit-page.spec.ts`
 
+**Fixture:** A member created via `POST /api/v1/members`, used in place of the `<known-id>` below so the test does not depend on a specific seeded id and any unexpected save is harmless.
+
+**Cleanup:** `afterEach` deletes the fixture member.
+
 **Steps:**
-  1. Navigate to /login, log in as viewer, navigate directly to /member/<known-id>/edit
+  1. Navigate to /login, log in as viewer, navigate directly to the FIXTURE member's /member/<fixture-id>/edit
     - expect: The edit form loads and is pre-filled just as it is for admin, with an enabled 'Save Changes' button — there is no client-side check that redirects a viewer away from this page
 
 #### 7.8. Session expiring mid-session (verify call starts failing) bounces the user to login
