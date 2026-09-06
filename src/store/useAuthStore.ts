@@ -25,6 +25,13 @@ interface useAuthStoreProps {
   hydrateAuth: () => void;
 }
 
+// Tracks the most recent checkToken() invocation. Verify calls are fired from an effect
+// that re-runs whenever `token` changes, so two can be in flight at once (typically the
+// initial "0" placeholder followed by the real token straight after login). Without this
+// counter, whichever response happened to land LAST won — so a slow 401 for the stale
+// placeholder could overwrite a fresh 200 and bounce an authenticated user to /login.
+let checkTokenSeq = 0;
+
 const useAuthStore = create<useAuthStoreProps>((set, get) => {
   // Read initial values from cookies (if they exist)
   const storedToken = Cookies.get("token") || "0";
@@ -85,8 +92,21 @@ const useAuthStore = create<useAuthStoreProps>((set, get) => {
       set({ isCheckingToken: checking }),
 
     async checkToken() {
-      set({ isCheckingToken: true });
+      const seq = ++checkTokenSeq;
       const token = get().token;
+
+      // `token` is the "0" placeholder until a cookie exists. Verifying it always 401s,
+      // so skip the pointless round trip -- and, more importantly, never let that 401
+      // land after a real token's 200. The result is the same as before (not signed in),
+      // it just no longer depends on which response wins a race.
+      if (!token || token === "0") {
+        if (seq === checkTokenSeq) {
+          set({ isValidToken: false, isCheckingToken: false });
+        }
+        return;
+      }
+
+      set({ isCheckingToken: true });
       try {
         const res = await axios.get(`${apiUrl}/api/v1/sessions/verify`, {
           headers: {
@@ -94,11 +114,16 @@ const useAuthStore = create<useAuthStoreProps>((set, get) => {
             Accept: "application/json",
           },
         });
+        // Discard the result if a newer checkToken() has started meanwhile.
+        if (seq !== checkTokenSeq) return;
         set({ isValidToken: res.status === 200 });
       } catch {
+        if (seq !== checkTokenSeq) return;
         set({ isValidToken: false });
       } finally {
-        set({ isCheckingToken: false });
+        if (seq === checkTokenSeq) {
+          set({ isCheckingToken: false });
+        }
       }
     },
 
