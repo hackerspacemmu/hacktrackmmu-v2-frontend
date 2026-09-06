@@ -40,8 +40,15 @@ export default function NavigationBar() {
       });
 
       if (response.status === 200) {
-        localStorage.setItem("manualLogout", "true");
-        router.push("/login");
+        showToast(
+          "Logout successfully! Redirecting you to main page",
+          "success",
+        );
+
+        // Navigate before clearing auth state: once the route is "/login" the
+        // AuthRedirectHandler is gated off, so clearing the token can't trigger
+        // its "You must be signed in" bounce on top of this logout.
+        await router.push("/login");
 
         clearAdmin();
         clearValidUntil();
