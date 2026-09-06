@@ -44,3 +44,5 @@ next-env.d.ts
 /dist/
 .vinext/
 .wrangler/
+.playwright-mcp/
+playwright-report/
