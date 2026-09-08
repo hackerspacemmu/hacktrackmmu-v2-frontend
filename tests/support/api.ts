@@ -121,3 +121,114 @@ export async function cleanUp(
     console.warn(`[cleanup] failed to delete ${label}:`, error);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Member fixtures (section 3 onward)
+// ---------------------------------------------------------------------------
+
+export interface MemberFixture {
+  id: number;
+  name: string;
+  email: string;
+}
+
+/**
+ * Builds a member name that no other worker -- and no seeded record -- can collide with.
+ *
+ * Fixtures are looked up by name (see createMember), and section 3 forbids selecting
+ * shared data by position, so the name doubles as the fixture's handle. Pass
+ * `test.info().workerIndex` so two workers running the same spec cannot generate the
+ * same tag inside the same millisecond.
+ */
+export function uniqueMemberName(label: string, workerIndex = 0): string {
+  return `E2E ${label} ${workerIndex}-${Date.now()}-${Math.floor(Math.random() * 1e4)}`;
+}
+
+/**
+ * Creates a member through the REST API and returns it with its database id.
+ *
+ * POST /api/v1/members answers with only `{ message, uuid }` -- no id -- so the id has to
+ * be recovered afterwards. GET /api/v1/members/search?query=<name> returns a flat array
+ * of full member records (not the `{data, meta}` envelope the /filtered route uses), and
+ * a name built by uniqueMemberName matches exactly one of them.
+ *
+ * `status` defaults to "active" so the fixture shows up under the /members page's default
+ * Active/Socially Active filter. Onboarding scenarios should pass "registered",
+ * "contacted" or "first_talk_given" instead.
+ */
+export async function createMember(
+  attributes: {
+    name: string;
+    email?: string;
+    status?: string;
+    contact_number?: string;
+    comment?: string;
+    student_id?: string;
+    discord_tag?: string;
+    other_info?: Record<string, string>;
+  },
+): Promise<MemberFixture> {
+  const member = {
+    status: "active",
+    email: `${attributes.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}@e2e.invalid`,
+    ...attributes,
+  };
+
+  return withAdminApi(async (api) => {
+    const createRes = await api.post("/api/v1/members", { data: { member } });
+    if (!createRes.ok()) {
+      throw new Error(
+        `[fixture] POST /api/v1/members failed (${createRes.status()}): ${await createRes.text()}`,
+      );
+    }
+
+    const searchRes = await api.get("/api/v1/members/search", {
+      params: { query: member.name },
+    });
+    if (!searchRes.ok()) {
+      throw new Error(
+        `[fixture] member lookup failed (${searchRes.status()}) for "${member.name}"`,
+      );
+    }
+
+    const matches = await searchRes.json();
+    const created = (Array.isArray(matches) ? matches : []).find(
+      (m: { name?: string }) => m?.name === member.name,
+    );
+    if (!created?.id) {
+      throw new Error(`[fixture] created member "${member.name}" was not found by search`);
+    }
+
+    return { id: created.id, name: created.name, email: created.email };
+  });
+}
+
+/**
+ * Deletes a fixture member by id.
+ *
+ * A 404 counts as success: the only thing teardown cares about is that the record is gone,
+ * and the delete-confirmation scenarios may legitimately have removed it already.
+ */
+export async function deleteMemberById(id: number): Promise<boolean> {
+  return withAdminApi(async (api) => {
+    const res = await api.delete(`/api/v1/members/${id}`);
+    return res.ok() || res.status() === 404;
+  });
+}
+
+/**
+ * Reads a member back through the REST API.
+ *
+ * Used by validation scenarios to prove the stored record is untouched, rather than
+ * inferring it from the absence of a PATCH request on the wire.
+ *
+ * Note the backend quirk documented in the plan: GET for a non-existent id answers 200
+ * with a null body rather than 404, so a null return means "no such member".
+ */
+export async function getMemberById(id: number): Promise<MemberFixture | null> {
+  return withAdminApi(async (api) => {
+    const res = await api.get(`/api/v1/members/${id}`);
+    if (!res.ok()) return null;
+    return (await res.json()) as MemberFixture | null;
+  });
+}
