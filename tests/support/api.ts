@@ -232,3 +232,283 @@ export async function getMemberById(id: number): Promise<MemberFixture | null> {
     return (await res.json()) as MemberFixture | null;
   });
 }
+
+// ---------------------------------------------------------------------------
+// Meetup fixtures (section 4)
+// ---------------------------------------------------------------------------
+
+export interface ProjectFixture {
+  id: number;
+  name: string;
+}
+
+export interface UpdateFixture {
+  id: number;
+  description: string;
+}
+
+export interface MeetupFixture {
+  id: number;
+  number: number;
+  date: string;
+  /** The meetup's host. A fixture member, never a seeded one -- see createMeetupFixture. */
+  host: MemberFixture;
+  /** Only present when the fixture was created `withUpdate`. */
+  project: ProjectFixture | null;
+  /** Only present when the fixture was created `withUpdate`. */
+  update: UpdateFixture | null;
+}
+
+/**
+ * Builds a short, collision-resistant fixture tag.
+ *
+ * Deliberately short: MeetupCard truncates an update's project name and author name to
+ * `slice(0, 40) + "..."` when either exceeds 40 characters. A long fixture name would
+ * therefore render truncated in the meetup modal, forcing every spec that asserts on
+ * those strings to re-implement the component's cutoff. Keeping tags well under 40
+ * characters means what the fixture stores is exactly what the UI shows.
+ *
+ * Entropy comes from a base36 millisecond stamp plus four random base36 characters
+ * (~1.7M combinations), so two workers creating a fixture in the same millisecond still
+ * get distinct names -- which matters because fixtures are looked up by exact name.
+ */
+function shortFixtureTag(prefix: string, label: string, workerIndex: number): string {
+  const slug = label.replace(/[^A-Za-z0-9]/g, "").slice(0, 8);
+  const stamp = Date.now().toString(36);
+  const rand = Math.floor(Math.random() * 1679616)
+    .toString(36)
+    .padStart(4, "0");
+  return `E2E ${prefix}${slug} ${workerIndex}-${stamp}-${rand}`;
+}
+
+/**
+ * Base of this worker's reserved meetup-number band.
+ *
+ * `meetups.number` is a UNIQUE index, so workers that each ask the app for "the next
+ * meetup number" collide. Each worker instead owns the hundred numbers starting here,
+ * far above any real meetup (the app is in the 400s), and createMeetupFixture walks that
+ * band until it finds a free slot.
+ */
+function reservedNumberBase(workerIndex: number): number {
+  return 90000 + workerIndex * 100;
+}
+
+/**
+ * Looks a meetup up by its number.
+ *
+ * The meetups index is ordered by `id` DESC -- newest first -- NOT by number and NOT by
+ * date. Verified against the running backend: page 1 reads
+ * `495(id 2959), 494(2958), 493(2925), 492(2892), 491(2860), 488(2827), 490(2826), ...`,
+ * where 488 sits ahead of 490 because it was created later despite its lower number and
+ * earlier date. A freshly created fixture therefore always holds the newest id and lands
+ * first on page 1, whatever number or date it was given.
+ *
+ * `GET /api/v1/meetups/search?query=` is NOT usable here -- it does not match on meetup
+ * number and returns [] for a number that exists.
+ */
+export async function findMeetupByNumber(
+  meetupNumber: number,
+): Promise<{ id: number; number: number; date: string; updates: UpdateFixture[] } | null> {
+  return withAdminApi(async (api) => {
+    const res = await api.get("/api/v1/meetups/", { params: { page: 1 } });
+    if (!res.ok()) return null;
+    const body = await res.json();
+    const regular = body?.data?.regular_meetups ?? [];
+    const match = regular.find(
+      (m: { number?: number }) => m?.number === meetupNumber,
+    );
+    if (!match) return null;
+    return {
+      id: match.id,
+      number: match.number,
+      date: match.date,
+      updates: (match.updates ?? []).map(
+        (u: { id: number; description: string }) => ({
+          id: u.id,
+          description: u.description,
+        }),
+      ),
+    };
+  });
+}
+
+/**
+ * Creates a self-contained meetup fixture: its own host member, and optionally its own
+ * project plus one update attached to the meetup.
+ *
+ * The host is a freshly created member rather than a seeded one on purpose. Assigning a
+ * seeded member as host permanently promotes them out of the app's finite "Yet To Host"
+ * pool for as long as the meetup exists, which is exactly the shared-state corruption
+ * section 4's isolation rule exists to prevent.
+ *
+ * The meetup number is taken from this worker's reserved band. A duplicate number answers
+ * 422 "Number has already been taken", so a collision (a repeat run, or a fixture that
+ * outlived its test) just advances to the next slot instead of failing the test.
+ */
+export async function createMeetupFixture(options: {
+  label: string;
+  workerIndex?: number;
+  date?: string;
+  withUpdate?: boolean;
+}): Promise<MeetupFixture> {
+  const workerIndex = options.workerIndex ?? 0;
+  const date = options.date ?? "2020-01-15";
+
+  const host = await createMember({
+    name: shortFixtureTag("H", options.label, workerIndex),
+    status: "active",
+  });
+
+  return withAdminApi(async (api) => {
+    // Walk this worker's reserved band for a free number.
+    const base = reservedNumberBase(workerIndex);
+    let created: { id: number; number: number } | null = null;
+    let lastError = "";
+
+    for (let n = 1; n <= 99 && !created; n++) {
+      const meetupNumber = base + n;
+      const res = await api.post("/api/v1/meetups", {
+        data: {
+          meetup: {
+            number: meetupNumber,
+            date,
+            category: "regular_meetup",
+            host_id: host.id,
+          },
+        },
+      });
+
+      if (res.ok()) {
+        const found = await findMeetupByNumber(meetupNumber);
+        if (!found) {
+          throw new Error(
+            `[fixture] meetup ${meetupNumber} was created but not found on page 1`,
+          );
+        }
+        created = { id: found.id, number: meetupNumber };
+        break;
+      }
+
+      lastError = `${res.status()}: ${await res.text()}`;
+      // 422 "Number has already been taken" is the only retryable outcome.
+      if (res.status() !== 422) break;
+    }
+
+    if (!created) {
+      throw new Error(
+        `[fixture] could not create a meetup in band ${base}+1..99 (last error ${lastError})`,
+      );
+    }
+
+    let project: ProjectFixture | null = null;
+    let update: UpdateFixture | null = null;
+
+    if (options.withUpdate) {
+      const projectName = shortFixtureTag("P", options.label, workerIndex);
+      const projectRes = await api.post("/api/v1/projects", {
+        data: {
+          project: {
+            name: projectName,
+            category: "project",
+            completed: false,
+            member_ids: [host.id],
+          },
+        },
+      });
+      if (!projectRes.ok()) {
+        throw new Error(
+          `[fixture] POST /api/v1/projects failed (${projectRes.status()}): ${await projectRes.text()}`,
+        );
+      }
+      const projectsRes = await api.get("/api/v1/projects");
+      const projects = await projectsRes.json();
+      const foundProject = (Array.isArray(projects) ? projects : []).find(
+        (p: { name?: string }) => p?.name === projectName,
+      );
+      if (!foundProject?.id) {
+        throw new Error(`[fixture] created project "${projectName}" was not found`);
+      }
+      project = { id: foundProject.id, name: foundProject.name };
+
+      const description = `E2E ${options.label} update ${workerIndex}-${Date.now()}`;
+      const updateRes = await api.post("/api/v1/updates", {
+        data: {
+          update: {
+            meetup_id: created.id,
+            member_id: host.id,
+            project_id: project.id,
+            category: "idea_talk",
+            description,
+          },
+        },
+      });
+      if (!updateRes.ok()) {
+        throw new Error(
+          `[fixture] POST /api/v1/updates failed (${updateRes.status()}): ${await updateRes.text()}`,
+        );
+      }
+      // POST /api/v1/updates returns only a message, and there is no updates index route,
+      // so the id is recovered from the meetup's own nested payload.
+      const withUpdates = await findMeetupByNumber(created.number);
+      const foundUpdate = (withUpdates?.updates ?? []).find(
+        (u) => u.description === description,
+      );
+      if (!foundUpdate?.id) {
+        throw new Error(`[fixture] created update "${description}" was not found`);
+      }
+      update = { id: foundUpdate.id, description };
+    }
+
+    return {
+      id: created.id,
+      number: created.number,
+      date,
+      host,
+      project,
+      update,
+    };
+  });
+}
+
+/**
+ * Removes everything createMeetupFixture made, in dependency order: the meetup (its
+ * updates cascade via `Meetup has_many :updates, dependent: :destroy`), then the project,
+ * then the host member.
+ *
+ * Every step tolerates the record already being gone -- the delete-confirmation scenarios
+ * may legitimately have removed the meetup themselves. The meetup and project deletes are
+ * guarded by a lookup first, because both answer 500 rather than 404 for an id that no
+ * longer exists (verified against the running backend); firing them blind would turn a
+ * clean teardown into a spurious warning. Deleting a missing member does answer 404, so
+ * that one is safe to attempt directly.
+ */
+export async function destroyMeetupFixture(
+  fixture: MeetupFixture,
+): Promise<boolean> {
+  const meetup = await findMeetupByNumber(fixture.number);
+
+  return withAdminApi(async (api) => {
+    let ok = true;
+
+    // The meetup goes first so its updates cascade before the project they point at.
+    if (meetup) {
+      ok = (await api.delete(`/api/v1/meetups/${meetup.id}`)).ok() && ok;
+    }
+
+    if (fixture.project) {
+      const listRes = await api.get("/api/v1/projects");
+      const projects = listRes.ok() ? await listRes.json() : [];
+      const stillThere = (Array.isArray(projects) ? projects : []).some(
+        (p: { id?: number }) => p?.id === fixture.project!.id,
+      );
+      if (stillThere) {
+        ok = (await api.delete(`/api/v1/projects/${fixture.project.id}`)).ok() && ok;
+      }
+    }
+
+    const memberRes = await api.delete(`/api/v1/members/${fixture.host.id}`);
+    ok = (memberRes.ok() || memberRes.status() === 404) && ok;
+
+    return ok;
+  });
+}
