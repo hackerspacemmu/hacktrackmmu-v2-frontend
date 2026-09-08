@@ -119,17 +119,12 @@ test.describe("Meetups", () => {
 
     // expect: Modal returns to the list/detail view showing the new date
     //
-    // The modal is re-opened from the fixture's own card first. src/pages/meetups.tsx
-    // renders regular meetups with `key={index}` (hackathons correctly use
-    // `key={meetup.id}`), so when the post-save refetch re-orders the id-DESC list --
-    // which happens whenever a PARALLEL worker's 90000-band fixture enters or leaves the
-    // list -- React rebinds the still-open modal to whatever meetup now sits at that array
-    // index, and it can end up showing a DIFFERENT meetup entirely. Verified: this failed
-    // under `--workers=4`. Re-opening by number pins the assertion to the fixture instead
-    // of to an array position.
-    await modal.getByRole("button", { name: "Close" }).click();
-    await expect(modal).toHaveCount(0, { timeout: 15000 });
-    await fixtureCardHeading.click();
+    // Asserted against the STILL-OPEN modal, deliberately. src/pages/meetups.tsx used to
+    // render meetup cards with `key={index}`, so any post-save refetch that re-ordered the
+    // list rebound the open modal to whatever meetup happened to land at that array index
+    // -- under `--workers=4` this modal really did end up showing a different meetup. The
+    // key is now `key={meetup.id}`, so asserting on the open modal here doubles as
+    // regression cover: if index-based keys ever come back, this fails.
     await expect(
       modal.getByRole("heading", {
         level: 2,

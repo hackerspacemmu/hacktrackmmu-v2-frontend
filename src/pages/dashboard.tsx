@@ -127,9 +127,9 @@ export default function Home() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-4">
           {Array.isArray(meetups) &&
-            meetups.map((meetup: any, index: number) => (
+            meetups.map((meetup: any) => (
               <MeetupCard
-                key={index}
+                key={meetup.id}
                 id={meetup.id}
                 number={meetup.number}
                 date={meetup.date}
