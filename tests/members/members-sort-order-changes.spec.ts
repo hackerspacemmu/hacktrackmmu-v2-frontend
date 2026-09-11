@@ -2,6 +2,7 @@
 // seed: seed.spec.ts
 
 import { test, expect } from "@playwright/test";
+import { captureTexts } from "../support/ui";
 
 test.describe("Members", () => {
   test("Sort By option changes member ordering", async ({ page }) => {
@@ -25,7 +26,7 @@ test.describe("Members", () => {
     // Each card heading renders the member's name in a leading <div>, followed by a
     // second <div> holding the status label, so scope to the first child to read names.
     const cardNameLocator = page.locator("div.grid > div h1 > div:first-child");
-    const namesBeforeSort = await cardNameLocator.allTextContents();
+    const namesBeforeSort = await captureTexts(cardNameLocator);
 
     // expect: Default sort is 'Recent Talks'
     await page.getByRole("button", { name: "Filter" }).click();
@@ -60,7 +61,7 @@ test.describe("Members", () => {
       "Ahmad Mobeen Mohammad Azeem",
       { timeout: 15000 },
     );
-    const namesAfterSort = await cardNameLocator.allTextContents();
+    const namesAfterSort = await captureTexts(cardNameLocator);
 
     // Verified against the API: both recent_talks and alphabetical currently return
     // "Abdullah Hakeem bin Ahmad Kamal" as the first result, so asserting "the first

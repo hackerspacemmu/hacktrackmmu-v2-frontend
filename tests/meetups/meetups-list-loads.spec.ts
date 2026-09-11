@@ -14,7 +14,15 @@ test.describe("Meetups", () => {
       .fill("secretarial slave");
     await page.getByRole("button", { name: "Login" }).click();
     await expect(page).toHaveURL("/dashboard", { timeout: 30000 });
-    await page.getByRole("link", { name: "Meetups" }).first().click();
+    // Scope to the top nav bar rather than `.first()` on the link itself. The slide-in
+    // Sidebar is a SIBLING of this <nav> and renders the same links, and its Onboarding
+    // link is gated on `isAdmin` alone while the desktop one needs `isClient && isAdmin`
+    // -- so during the hydration window the sidebar's copy is the FIRST match in the DOM.
+    // The closed sidebar is translated off-screen (-translate-x-full), which Playwright
+    // still reports as visible, so `.first().click()` times out with "element is outside
+    // of the viewport" rather than failing fast.
+    const desktopNav = page.getByRole("navigation").first();
+    await desktopNav.getByRole("link", { name: "Meetups" }).click();
 
     // expect: URL is /meetups
     await expect(page).toHaveURL("/meetups", { timeout: 30000 });

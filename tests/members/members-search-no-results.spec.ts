@@ -49,7 +49,12 @@ test.describe("Members", () => {
     await clearIcon.click();
 
     await expect(memberCards.first()).toBeVisible({ timeout: 15000 });
-    expect(await memberCards.count()).toBeGreaterThan(0);
+    // A retrying count assertion, NOT `expect(await cards.count())`. /members rebuilds its
+    // SWR key whenever `token`, the page, the filter or the sort changes (and `token`
+    // starts empty until the auth store hydrates), so `isLoading` goes true again and the
+    // skeleton grid re-renders AFTER real cards were already shown. An imperative count()
+    // can land in that window and read 0; `not.toHaveCount(0)` retries until it does not.
+    await expect(memberCards).not.toHaveCount(0, { timeout: 15000 });
 
     // ...and brings the pagination pill back
     await expect(pager).toBeVisible({ timeout: 15000 });

@@ -2,6 +2,7 @@
 // seed: seed.spec.ts
 
 import { test, expect } from "@playwright/test";
+import { captureTexts } from "../support/ui";
 
 test.describe("Meetups", () => {
   test("Pagination navigates between pages of meetups", async ({ page }) => {
@@ -68,10 +69,11 @@ test.describe("Meetups", () => {
       expect(after.slice(0, common)).toEqual(before.slice(0, common));
     };
 
+
     const page1MeetupNames = withoutFixtureMeetups(
-      await meetupHeadings.allTextContents(),
+      await captureTexts(meetupHeadings),
     );
-    const page1HackathonNames = await hackathonHeadings.allTextContents();
+    const page1HackathonNames = await captureTexts(hackathonHeadings);
 
     // 2. Click the next-page chevron
     const page2ResponsePromise = page.waitForResponse(
@@ -93,9 +95,9 @@ test.describe("Meetups", () => {
     await expect(meetupHeadings.first()).toBeVisible({ timeout: 15000 });
     await expect(hackathonHeadings.first()).toBeVisible({ timeout: 15000 });
     const page2MeetupNames = withoutFixtureMeetups(
-      await meetupHeadings.allTextContents(),
+      await captureTexts(meetupHeadings),
     );
-    const page2HackathonNames = await hackathonHeadings.allTextContents();
+    const page2HackathonNames = await captureTexts(hackathonHeadings);
     expect(page2MeetupNames.length).toBeGreaterThan(0);
     expect(page2MeetupNames).not.toEqual(page1MeetupNames);
     expect(page2HackathonNames).not.toEqual(page1HackathonNames);
@@ -108,9 +110,9 @@ test.describe("Meetups", () => {
     await expect(meetupHeadings.first()).toBeVisible({ timeout: 15000 });
     await expect(hackathonHeadings.first()).toBeVisible({ timeout: 15000 });
     const page1MeetupNamesAgain = withoutFixtureMeetups(
-      await meetupHeadings.allTextContents(),
+      await captureTexts(meetupHeadings),
     );
-    const page1HackathonNamesAgain = await hackathonHeadings.allTextContents();
+    const page1HackathonNamesAgain = await captureTexts(hackathonHeadings);
     expectSameOrdering(page1MeetupNames, page1MeetupNamesAgain);
     // No spec creates hackathon fixtures, so the hackathon side of page 1 is stable and
     // can still be asserted for exact equality.

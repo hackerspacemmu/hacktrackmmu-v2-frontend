@@ -699,6 +699,15 @@ assertion failure with a confusing cleanup error. Log a warning instead; see `cl
 
 **File:** `tests/onboarding/onboarding-filter-by-status.spec.ts`
 
+**Fixture:** A member created via `POST /api/v1/members` with `status: "registered"`. This
+scenario narrows the list to a SINGLE status and then asserts on the surviving rows, so at
+least one member must sit at that status. It cannot rely on seed data for that — the
+backend currently holds ZERO `registered` members (all 32 onboarding members are at
+`first_talk_given`), so without a fixture the table renders "No members found" and the row
+assertions have nothing to check.
+
+**Cleanup:** `afterEach` deletes the fixture member.
+
 **Steps:**
   1. Navigate to /login, log in as admin, go to /onboarding, open the Filter popover
     - expect: Status selector includes 'All' plus every MemberStatus option, and a Sort By selector with Latest/Earliest Registered, Recent Talks, Alphabetical

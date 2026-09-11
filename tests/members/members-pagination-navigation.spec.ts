@@ -2,6 +2,7 @@
 // seed: seed.spec.ts
 
 import { test, expect } from "@playwright/test";
+import { captureTexts } from "../support/ui";
 
 test.describe("Members", () => {
   test("Pagination next/previous buttons navigate between pages", async ({
@@ -38,8 +39,8 @@ test.describe("Members", () => {
     await expect(prevButton).toBeDisabled({ timeout: 15000 });
     // Both buttons are also disabled while isLoading, so this confirms the grid has
     // settled (N > 1 holds today: default Active + Socially Active yields 3 pages).
-    await expect(nextButton).not.toBeDisabled({ timeout: 3000 });
-    const page1Names = await cardNameLocator.allTextContents();
+    await expect(nextButton).not.toBeDisabled({ timeout: 15000 });
+    const page1Names = await captureTexts(cardNameLocator);
 
     // 2. Click the next-page (chevron right) button
     const page2ResponsePromise = page.waitForResponse(
@@ -65,7 +66,7 @@ test.describe("Members", () => {
       "Ganessa A/L Tiagrajah",
       { timeout: 15000 },
     );
-    const page2Names = await cardNameLocator.allTextContents();
+    const page2Names = await captureTexts(cardNameLocator);
     expect(page2Names).not.toEqual(page1Names);
 
     // 3. Click the previous-page button
@@ -77,7 +78,7 @@ test.describe("Members", () => {
       "Abdullah Hakeem bin Ahmad Kamal",
       { timeout: 15000 },
     );
-    const page1NamesAgain = await cardNameLocator.allTextContents();
+    const page1NamesAgain = await captureTexts(cardNameLocator);
     expect(page1NamesAgain).toEqual(page1Names);
 
     // expect: Previous button disabled again

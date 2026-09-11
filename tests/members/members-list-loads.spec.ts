@@ -12,9 +12,15 @@ test.describe("Members", () => {
     await page.getByRole("textbox", { name: "Password" }).fill("secretarial slave");
     await page.getByRole("button", { name: "Login" }).click();
     await expect(page).toHaveURL("/dashboard", { timeout: 30000 });
-    // The nav renders twice (desktop bar + mobile sidebar), so .first() is required
-    // to avoid a strict-mode violation.
-    await page.getByRole("link", { name: "Members" }).first().click();
+    // Scope to the top nav bar rather than `.first()` on the link itself. The slide-in
+    // Sidebar is a SIBLING of this <nav> and renders the same links, and its Onboarding
+    // link is gated on `isAdmin` alone while the desktop one needs `isClient && isAdmin`
+    // -- so during the hydration window the sidebar's copy is the FIRST match in the DOM.
+    // The closed sidebar is translated off-screen (-translate-x-full), which Playwright
+    // still reports as visible, so `.first().click()` times out with "element is outside
+    // of the viewport" rather than failing fast.
+    const desktopNav = page.getByRole("navigation").first();
+    await desktopNav.getByRole("link", { name: "Members" }).click();
 
     // expect: URL is /members
     await expect(page).toHaveURL("/members", { timeout: 15000 });
@@ -32,7 +38,12 @@ test.describe("Members", () => {
       // loading. Every real card renders "<n> Projects"; no skeleton does.
       .filter({ hasText: /\d+ Projects/ });
     await expect(memberCards.first()).toBeVisible({ timeout: 15000 });
-    expect(await memberCards.count()).toBeGreaterThan(0);
+    // A retrying count assertion, NOT `expect(await cards.count())`. /members rebuilds its
+    // SWR key whenever `token`, the page, the filter or the sort changes (and `token`
+    // starts empty until the auth store hydrates), so `isLoading` goes true again and the
+    // skeleton grid re-renders AFTER real cards were already shown. An imperative count()
+    // can land in that window and read 0; `not.toHaveCount(0)` retries until it does not.
+    await expect(memberCards).not.toHaveCount(0, { timeout: 15000 });
 
     // expect: Default status chips 'Active' and 'Socially Active' are shown next to the heading
     const statusChips = page.locator("div.currentStatusMap");
@@ -54,7 +65,10 @@ test.describe("Members", () => {
     const prevButton = pager.getByRole("button").first();
     const nextButton = pager.getByRole("button").last();
     await expect(prevButton).toBeDisabled({ timeout: 15000 });
-    // The next button is enabled because there is more than one page.
-    await expect(nextButton).not.toBeDisabled({ timeout: 3000 });
+    // The next button is enabled because there is more than one page (the default
+    // Active + Socially Active filter yields 3 pages today). It is ALSO disabled while
+    // isLoading -- `disabled={isLoading || paginationNumber === totalPagination}` -- so a
+    // skeleton re-render can briefly disable it; the timeout has to cover that, not 3s.
+    await expect(nextButton).not.toBeDisabled({ timeout: 15000 });
   });
 });
