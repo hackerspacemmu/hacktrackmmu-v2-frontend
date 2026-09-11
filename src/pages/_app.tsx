@@ -47,18 +47,10 @@ function AuthRedirectHandler() {
       clearAdmin();
       clearValidUntil();
 
-      // Check for manual logout flag
+      // Only forced bounces reach here — a manual logout shows its own toast and
+      // navigates to "/login" before clearing state, which gates this branch off.
       setTimeout(() => {
-        const manualLogout = localStorage.getItem("manualLogout");
-        if (manualLogout) {
-          showToast(
-            "Logout successfully! Redirecting you to main page",
-            "success",
-          );
-          localStorage.removeItem("manualLogout");
-        } else {
-          showToast("You must be signed in to access this page.", "error");
-        }
+        showToast("You must be signed in to access this page.", "error");
         router.replace("/login");
       }, 200);
     }
