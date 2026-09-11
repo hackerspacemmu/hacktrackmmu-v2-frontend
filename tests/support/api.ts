@@ -130,6 +130,13 @@ export interface MemberFixture {
   id: number;
   name: string;
   email: string;
+  /**
+   * Only populated by getMemberById, which returns the member record as the API stores
+   * it. createMember does not return it -- POST /api/v1/members answers with just
+   * `{ message, uuid }`, and the follow-up search lookup is only used to recover the id.
+   * Read it when a scenario needs to prove a status write did (or did not) land.
+   */
+  status?: string;
 }
 
 /**
