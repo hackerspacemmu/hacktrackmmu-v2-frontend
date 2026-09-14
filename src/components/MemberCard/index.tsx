@@ -13,7 +13,7 @@ import {
   CalendarRange,
   History,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ModalLayout } from "../ModalLayout";
 import useAuthStore from "@/store/useAuthStore";
 import Link from "next/link";
@@ -48,12 +48,40 @@ export default function MemberCard({
   const { token, isAdmin } = useAuthStore();
   const { showToast } = useToast();
 
+  const allUpdates = useMemo(() => {
+    return (projects || [])
+      .flatMap((project) =>
+        (project.updates || []).map((update: Update) => ({
+          ...update,
+          projectName: project.name,
+        })),
+      )
+      .sort((a, b) => {
+        const dateA = a.meetup?.date
+          ? new Date(a.meetup.date).getTime()
+          : a.created_at
+            ? new Date(a.created_at).getTime()
+            : 0;
+        const dateB = b.meetup?.date
+          ? new Date(b.meetup.date).getTime()
+          : b.created_at
+            ? new Date(b.created_at).getTime()
+            : 0;
+        return dateB - dateA;
+      });
+  }, [projects]);
+
   let ideaTalksCount = 0;
   let progressTalksCount = 0;
-  const numberOfUpdates = projects.reduce(
-    (acc, project) => acc + project.updates.length,
-    0,
-  );
+
+  allUpdates.forEach((update) => {
+    const cat = String(update.category);
+    if (cat === "idea_talk" || cat === "0") {
+      ideaTalksCount++;
+    } else {
+      progressTalksCount++;
+    }
+  });
 
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [modalView, setModalView] = useState<
@@ -68,17 +96,6 @@ export default function MemberCard({
   const [editingUpdateId, setEditingUpdateId] = useState<
     string | number | null
   >(null);
-
-  projects.forEach((project) => {
-    project.updates?.forEach((update) => {
-      const cat = String(update.category);
-      if (cat === "idea_talk" || cat === "0") {
-        ideaTalksCount++;
-      } else {
-        progressTalksCount++;
-      }
-    });
-  });
 
   const handleCardClick = () => setIsModalOpen(true);
 
@@ -223,13 +240,10 @@ export default function MemberCard({
   };
 
   const findEditingProject = projects.find((p) => p.id === editingProjectId);
-  let findEditingUpdate: Update | undefined;
-  if (modalView === "edit-update") {
-    projects.forEach((p) => {
-      const match = p.updates?.find((u) => u.id === editingUpdateId);
-      if (match) findEditingUpdate = match;
-    });
-  }
+  const findEditingUpdate =
+    modalView === "edit-update"
+      ? allUpdates.find((u) => u.id === editingUpdateId)
+      : undefined;
 
   return (
     <>
@@ -352,71 +366,67 @@ export default function MemberCard({
 
             <h3 className="text-lg font-semibold mb-1">Talks</h3>
             <div className="overflow-y-auto border flex flex-col gap-y-3 px-4 py-3 mb-8 max-h-56 lg:max-h-80 rounded-md border-gray-700">
-              {projects && projects.length !== 0 && numberOfUpdates > 0 ? (
-                projects.map((project) =>
-                  project.updates
-                    ? project.updates.map((update: Update) => (
-                        <div
-                          key={update.id}
-                          className={`border-b border-gray-700 pb-3 last:border-0 last:pb-0 transition-opacity duration-200 ${
-                            deletingId === `update-${update.id}`
-                              ? "opacity-30 pointer-events-none"
-                              : "opacity-100"
-                          }`}
-                        >
-                          <div className="flex justify-between items-start group">
-                            <div className="font-bold flex items-center flex-1 min-w-0 mt-1">
-                              <p className="font-semibold truncate">
-                                {project.name}
-                              </p>
-                              {String(update.category) === "idea_talk" ||
-                              String(update.category) === "0" ? (
-                                <Lightbulb
-                                  size="14"
-                                  className="ml-2 shrink-0"
-                                />
-                              ) : (
-                                <Hammer
-                                  size="14"
-                                  className="ml-2 shrink-0 text-blue-400"
-                                />
-                              )}
-                            </div>
+              {allUpdates.length > 0 ? (
+                allUpdates.map((update) => (
+                  <div
+                    key={update.id}
+                    className={`border-b border-gray-700 pb-3 last:border-0 last:pb-0 transition-opacity duration-200 ${
+                      deletingId === `update-${update.id}`
+                        ? "opacity-30 pointer-events-none"
+                        : "opacity-100"
+                    }`}
+                  >
+                    <div className="flex justify-between items-start group">
+                      <div className="font-bold flex items-center flex-1 min-w-0 mt-1">
+                        <p className="font-semibold truncate">
+                          {update.projectName}
+                        </p>
+                        {String(update.category) === "idea_talk" ||
+                        String(update.category) === "0" ? (
+                          <Lightbulb
+                            size="14"
+                            className="ml-2 shrink-0"
+                          />
+                        ) : (
+                          <Hammer
+                            size="14"
+                            className="ml-2 shrink-0 text-blue-400"
+                          />
+                        )}
+                      </div>
 
-                            {isAdmin && (
-                              <div className="flex gap-x-3 shrink-0 ml-4 opacity-100 mt-1">
-                                <button
-                                  onClick={() => handleEditUpdateClick(update)}
-                                >
-                                  <Edit
-                                    size="16"
-                                    className="text-blue-500 hover:text-blue-400"
-                                  />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteUpdate(update.id)}
-                                >
-                                  <Trash
-                                    size="16"
-                                    className="text-red-500 hover:text-red-400"
-                                  />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-
-                          <p className="text-sm mt-1 break-words whitespace-pre-line">
-                            {update.description}
-                          </p>
-                          <p className="text-[#777] mt-1 text-sm font-semibold">
-                            {update.meetup
-                              ? dayjs(update.meetup.date).format("MMM D, YYYY")
-                              : "Unknown Date"}
-                          </p>
+                      {isAdmin && (
+                        <div className="flex gap-x-3 shrink-0 ml-4 opacity-100 mt-1">
+                          <button
+                            onClick={() => handleEditUpdateClick(update)}
+                          >
+                            <Edit
+                              size="16"
+                              className="text-blue-500 hover:text-blue-400"
+                            />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUpdate(update.id)}
+                          >
+                            <Trash
+                              size="16"
+                              className="text-red-500 hover:text-red-400"
+                            />
+                          </button>
                         </div>
-                      ))
-                    : null,
-                )
+                      )}
+                    </div>
+
+                    <p className="text-sm mt-1 break-words whitespace-pre-line">
+                      {update.description}
+                    </p>
+                    <p className="text-[#777] mt-1 text-sm font-semibold">
+                      {update.meetup
+                        ? dayjs(update.meetup.date).format("MMM D, YYYY")
+                        : "Unknown Date"}
+                    </p>
+                  </div>
+                ))
               ) : (
                 <p className="text-red-400 flex items-center gap-x-2">
                   <CircleAlert size="18" /> No updates made
