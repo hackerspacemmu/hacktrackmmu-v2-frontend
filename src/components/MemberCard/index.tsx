@@ -48,6 +48,14 @@ export default function MemberCard({
   const { token, isAdmin } = useAuthStore();
   const { showToast } = useToast();
 
+  const sortedProjects = useMemo(() => {
+    return [...(projects || [])].sort((a, b) => {
+      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return dateB - dateA;
+    });
+  }, [projects]);
+
   const allUpdates = useMemo(() => {
     return (projects || [])
       .flatMap((project) =>
@@ -318,8 +326,8 @@ export default function MemberCard({
 
             <h3 className="text-lg font-semibold mb-1">Projects</h3>
             <div className="border border-gray-700 py-3 px-4 rounded-md mb-3 max-h-48 lg:max-h-64 overflow-y-auto flex flex-col gap-1">
-              {projects && projects.length !== 0 ? (
-                projects.map((project: Project) => (
+              {sortedProjects.length !== 0 ? (
+                sortedProjects.map((project: Project) => (
                   <div
                     key={project.id}
                     className={`flex items-start justify-between group py-1.5 border-b border-gray-700 last:border-0 transition-opacity duration-200 ${
