@@ -296,7 +296,7 @@ test.describe("QR self check-in", () => {
     );
     await submitEmail(page, attended.email);
     await expect(
-      page.getByText(/can't be used to check in to the Meet & Greet/),
+      page.getByText(/can't be used to check in for the Meet & Greet/),
     ).toBeVisible({ timeout: 10000 });
 
     // Attended M&G member scanning the Session QR.
@@ -305,7 +305,7 @@ test.describe("QR self check-in", () => {
     );
     await submitEmail(page, attendedMg.email);
     await expect(
-      page.getByText(/can't be used to check in to today's session/),
+      page.getByText(/can't be used to check in for today's session/),
     ).toBeVisible({ timeout: 10000 });
 
     expect((await getMemberById(attended.id))?.status).toBe("attended");
@@ -368,7 +368,7 @@ test.describe("QR self check-in", () => {
 
     await submitEmail(page, active.email);
     await expect(
-      page.getByText(/can't be used to check in to the Meet & Greet/),
+      page.getByText(/can't be used to check in for the Meet & Greet/),
     ).toBeVisible({ timeout: 10000 });
     expect((await getMemberById(active.id))?.status).toBe("active");
   });
