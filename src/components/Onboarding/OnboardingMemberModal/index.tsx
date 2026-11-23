@@ -45,6 +45,8 @@ const convertToWhatsapp = (phoneNumber: string) => {
 const STATUS_ORDER = [
   MemberStatus.Registered,
   MemberStatus.Contacted,
+  MemberStatus.Attended,
+  MemberStatus.AttendedMG,
   MemberStatus.FirstTalkGiven,
   MemberStatus.NeverActive,
   MemberStatus.Active,

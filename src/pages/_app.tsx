@@ -11,6 +11,10 @@ const hankenGrotesk = Hanken_Grotesk({
   subsets: ["latin"],
 });
 
+// Pages reachable without signing in. /checkin is opened by members scanning the
+// Meet & Greet QR code and is authorised by the token in its URL instead.
+const PUBLIC_PATHS = ["/", "/login", "/checkin"];
+
 function AuthRedirectHandler() {
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
@@ -40,8 +44,7 @@ function AuthRedirectHandler() {
     if (
       !isCheckingToken &&
       !isValidToken &&
-      router.pathname !== "/login" &&
-      router.pathname !== "/"
+      !PUBLIC_PATHS.includes(router.pathname)
     ) {
       clearToken();
       clearAdmin();

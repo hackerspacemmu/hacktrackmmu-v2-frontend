@@ -20,6 +20,8 @@ interface OnboardingMobileCardProps {
 const ONBOARDING_STATUSES = [
   MemberStatus.Registered,
   MemberStatus.Contacted,
+  MemberStatus.Attended,
+  MemberStatus.AttendedMG,
   MemberStatus.FirstTalkGiven,
   MemberStatus.NeverActive,
   MemberStatus.Active,

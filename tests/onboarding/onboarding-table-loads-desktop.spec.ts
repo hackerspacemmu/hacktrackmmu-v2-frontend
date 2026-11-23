@@ -49,7 +49,8 @@ test.describe("Onboarding", () => {
       table.getByRole("columnheader", { name: "Options" }),
     ).toBeVisible();
 
-    // expect: The default status chips show Registered, Contacted and First Talk Given
+    // expect: The default status chips show Registered, Contacted, Attended,
+    // Attended M&G and First Talk Given
     // Scope to the chip container (div.currentStatusMap, per onboarding.tsx) since plain
     // member names in the table body can otherwise collide with the same status text.
     const statusChips = page.locator("div.currentStatusMap");
@@ -58,6 +59,12 @@ test.describe("Onboarding", () => {
     ).toBeVisible({ timeout: 15000 });
     await expect(
       statusChips.getByText("Contacted", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      statusChips.getByText("Attended", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      statusChips.getByText("Attended M&G", { exact: true }),
     ).toBeVisible();
     await expect(
       statusChips.getByText("First Talk Given", { exact: true }),
@@ -78,6 +85,6 @@ test.describe("Onboarding", () => {
     // the row rather than by role, and confirm it carries the full status option list.
     const statusSelect = firstRow.locator("select");
     await expect(statusSelect).toBeVisible();
-    await expect(statusSelect.locator("option")).toHaveCount(10);
+    await expect(statusSelect.locator("option")).toHaveCount(12);
   });
 });

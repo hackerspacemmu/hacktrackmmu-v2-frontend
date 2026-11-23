@@ -66,10 +66,14 @@ export default function Home() {
             <div className="flex justify-between items-center">
               <h2 className="text-3xl font-semibold">Control Panel</h2>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
               <SkeletonActionButton />
               <SkeletonActionButton />
               <SkeletonActionButton />
+              <div className="grid grid-cols-2 gap-4">
+                <SkeletonActionButton />
+                <SkeletonActionButton />
+              </div>
             </div>
           </div>
         )}
@@ -97,7 +101,9 @@ export default function Home() {
   if (meetupsError) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <h1 className="text-4xl font-bold text-red-500">Error loading dashboard meetups.</h1>
+        <h1 className="text-4xl font-bold text-red-500">
+          Error loading dashboard meetups.
+        </h1>
       </div>
     );
   }
@@ -200,7 +206,9 @@ export default function Home() {
             ))}
           </div>
         ) : membersError ? (
-          <div className="mt-4 text-red-500">Failed to load active members.</div>
+          <div className="mt-4 text-red-500">
+            Failed to load active members.
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-4">
             {Array.isArray(members) &&
