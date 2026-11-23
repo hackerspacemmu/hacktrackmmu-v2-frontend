@@ -284,7 +284,7 @@ test.describe("QR self check-in", () => {
     expect((await getMemberById(member.id))?.status).toBe("attended");
   });
 
-  test("members can't use the other event's QR once checked in", async ({
+  test("members checked in at the other event are told where, not shown an error", async ({
     page,
   }) => {
     const attended = await fixture("Checkin Attended", "attended");
@@ -296,8 +296,15 @@ test.describe("QR self check-in", () => {
     );
     await submitEmail(page, attended.email);
     await expect(
-      page.getByText(/can't be used to check in for the Meet & Greet/),
+      page.getByRole("heading", {
+        name: `You've already checked in, ${firstName(attended)}`,
+      }),
     ).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.getByText(
+        "You checked in at a regular session earlier, so you can't also check in for the Meet & Greet.",
+      ),
+    ).toBeVisible();
 
     // Attended M&G member scanning the Session QR.
     await page.goto(
@@ -305,7 +312,9 @@ test.describe("QR self check-in", () => {
     );
     await submitEmail(page, attendedMg.email);
     await expect(
-      page.getByText(/can't be used to check in for today's session/),
+      page.getByText(
+        "You checked in at the Meet & Greet earlier, so you can't also check in for today's session.",
+      ),
     ).toBeVisible({ timeout: 10000 });
 
     expect((await getMemberById(attended.id))?.status).toBe("attended");
@@ -361,16 +370,63 @@ test.describe("QR self check-in", () => {
     });
   });
 
-  test("members past onboarding can't use the check-in", async ({ page }) => {
+  test("members past onboarding are told there's no need to check in", async ({
+    page,
+  }) => {
     const active = await fixture("Checkin Act", "active");
     const token = await createCheckInToken();
     await page.goto(`/checkin?token=${encodeURIComponent(token)}`);
 
     await submitEmail(page, active.email);
     await expect(
-      page.getByText(/can't be used to check in for the Meet & Greet/),
+      page.getByRole("heading", {
+        name: `No need to check in, ${firstName(active)}`,
+      }),
     ).toBeVisible({ timeout: 10000 });
     expect((await getMemberById(active.id))?.status).toBe("active");
+  });
+
+  test("checking in again shows 'already checked in' and lets you try another email", async ({
+    page,
+  }) => {
+    const member = await fixture("Checkin Again", "attended_mg");
+    const token = await createCheckInToken();
+    await page.goto(`/checkin?token=${encodeURIComponent(token)}`);
+
+    await submitEmail(page, member.email);
+    await expect(
+      page.getByRole("heading", {
+        name: `You're already checked in, ${firstName(member)}!`,
+      }),
+    ).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.getByText("You checked in to the Meet & Greet earlier"),
+    ).toBeVisible();
+
+    await page
+      .getByRole("button", { name: "Not you? Use a different email" })
+      .click();
+    await expect(page.getByRole("textbox", { name: "Your email" })).toHaveValue(
+      "",
+    );
+    expect((await getMemberById(member.id))?.status).toBe("attended_mg");
+  });
+
+  test("terminated members get a generic message that doesn't reveal their status", async ({
+    page,
+  }) => {
+    const member = await fixture("Checkin Term", "terminated");
+    const token = await createCheckInToken();
+    await page.goto(`/checkin?token=${encodeURIComponent(token)}`);
+
+    await submitEmail(page, member.email);
+    await expect(
+      page.getByText(
+        "This email can't be used to check in. Please ask an organiser.",
+      ),
+    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/terminated/i)).toHaveCount(0);
+    expect((await getMemberById(member.id))?.status).toBe("terminated");
   });
 
   test("an invalid or missing token is rejected", async ({ page }) => {

@@ -3,7 +3,14 @@ import Head from "next/head";
 import Image from "next/image";
 import { useRouter } from "next/router";
 import axios from "axios";
-import { CircleAlert, CircleCheck, LoaderCircle, Mail } from "lucide-react";
+import {
+  BadgeCheck,
+  CircleAlert,
+  CircleCheck,
+  Info,
+  LoaderCircle,
+  Mail,
+} from "lucide-react";
 import { apiUrl } from "@/utils/env";
 import { useDarkMode } from "@/hooks/useDarkMode";
 import {
@@ -14,19 +21,28 @@ import {
 
 // Public page opened by scanning a check-in QR code (regular session or Meet &
 // Greet) on the admin dashboard. The `token` query param (signed by the backend,
-// valid for an hour) authorises the check-in and fixes which event it is for. Members must type their exact registered email: there is no
-// search, so the link can't be used to browse the membership list.
+// valid for an hour) authorises the check-in and fixes which event it is for.
+// Members must type their exact registered email: there is no search, so the
+// link can't be used to browse the membership list.
+
+// Final results for an email that belongs to a member (see the `reason` codes
+// in the backend's CheckInsController#create). Not-found and other retryable
+// errors stay inline on the form instead.
+type CheckInOutcome =
+  | { reason: "checked_in"; name: string }
+  | { reason: "already_checked_in"; name: string }
+  | {
+      reason: "checked_in_other_event";
+      name: string;
+      checkedInAt: CheckInKind;
+    }
+  | { reason: "already_onboarded"; name: string };
 
 type PageState =
   | { kind: "verifying" }
   | { kind: "invalid"; message: string }
   | { kind: "form"; event: CheckInKind }
-  | {
-      kind: "done";
-      event: CheckInKind;
-      name: string;
-      alreadyCheckedIn: boolean;
-    };
+  | { kind: "done"; event: CheckInKind; outcome: CheckInOutcome };
 
 const EMAIL_NOT_FOUND_MESSAGE =
   "This email doesn't exist, are you sure you registered with this email?";
@@ -128,29 +144,21 @@ export default function CheckInPage() {
           {view.kind === "form" && token && (
             <CheckInForm
               token={token}
-              onDone={(name, alreadyCheckedIn) =>
-                setState({
-                  kind: "done",
-                  event: view.event,
-                  name,
-                  alreadyCheckedIn,
-                })
+              onDone={(outcome) =>
+                setState({ kind: "done", event: view.event, outcome })
               }
               onTokenRejected={handleTokenRejected}
             />
           )}
 
           {view.kind === "done" && (
-            <StatusCard
-              tone="success"
-              title={
-                view.alreadyCheckedIn
-                  ? `You're already checked in, ${view.name}!`
-                  : `You're checked in, ${view.name}!`
+            <OutcomeCard
+              event={view.event}
+              outcome={view.outcome}
+              onUseDifferentEmail={() =>
+                setState({ kind: "form", event: view.event })
               }
-            >
-              {CHECK_IN_KINDS[view.event].welcome} You can close this page now.
-            </StatusCard>
+            />
           )}
         </div>
       </div>
@@ -164,7 +172,7 @@ function CheckInForm({
   onTokenRejected,
 }: {
   token: string;
-  onDone: (name: string, alreadyCheckedIn: boolean) => void;
+  onDone: (outcome: CheckInOutcome) => void;
   onTokenRejected: (message: string) => void;
 }) {
   const [email, setEmail] = useState("");
@@ -184,11 +192,34 @@ function CheckInForm({
         token,
         email: email.trim(),
       });
-      onDone(res.data.name, Boolean(res.data.already_checked_in));
+      onDone({
+        reason: res.data.already_checked_in
+          ? "already_checked_in"
+          : "checked_in",
+        name: res.data.name,
+      });
     } catch (err) {
       const status = axios.isAxiosError(err) ? err.response?.status : null;
+      const data = axios.isAxiosError(err) ? err.response?.data : null;
       if (status === 401) {
         onTokenRejected(errorMessage(err, "This QR code is no longer valid."));
+        return;
+      }
+      // The email belongs to a member, but there's nothing to check in.
+      if (
+        status === 409 &&
+        data?.reason === "checked_in_other_event" &&
+        isCheckInKind(data.checked_in_at)
+      ) {
+        onDone({
+          reason: "checked_in_other_event",
+          name: data.name,
+          checkedInAt: data.checked_in_at,
+        });
+        return;
+      }
+      if (status === 409 && data?.reason === "already_onboarded") {
+        onDone({ reason: "already_onboarded", name: data.name });
         return;
       }
       setError(
@@ -277,20 +308,112 @@ function CheckInForm({
   );
 }
 
+function OutcomeCard({
+  event,
+  outcome,
+  onUseDifferentEmail,
+}: {
+  event: CheckInKind;
+  outcome: CheckInOutcome;
+  onUseDifferentEmail: () => void;
+}) {
+  const kind = CHECK_IN_KINDS[event];
+
+  if (outcome.reason === "checked_in") {
+    return (
+      <StatusCard tone="success" title={`You're checked in, ${outcome.name}!`}>
+        {kind.welcome} You can close this page now.
+      </StatusCard>
+    );
+  }
+
+  // The remaining outcomes aren't errors: the member exists and there's simply
+  // nothing to do. Offer a way back in case they typed someone else's email.
+  const differentEmail = (
+    <button
+      type="button"
+      onClick={onUseDifferentEmail}
+      className="mt-4 text-sm underline underline-offset-2"
+    >
+      Not you? Use a different email
+    </button>
+  );
+
+  if (outcome.reason === "already_checked_in") {
+    return (
+      <StatusCard
+        tone="info"
+        icon={BadgeCheck}
+        title={`You're already checked in, ${outcome.name}!`}
+        action={differentEmail}
+      >
+        You checked in to {kind.eventName} earlier, so there&apos;s nothing else
+        to do. You can close this page now.
+      </StatusCard>
+    );
+  }
+
+  if (outcome.reason === "checked_in_other_event") {
+    return (
+      <StatusCard
+        tone="info"
+        icon={Info}
+        title={`You've already checked in, ${outcome.name}`}
+        action={differentEmail}
+      >
+        You checked in at {CHECK_IN_KINDS[outcome.checkedInAt].pastEventName}{" "}
+        earlier, so you can&apos;t also check in for {kind.eventName}. If
+        that&apos;s not right, please ask an organiser.
+      </StatusCard>
+    );
+  }
+
+  return (
+    <StatusCard
+      tone="info"
+      icon={Info}
+      title={`No need to check in, ${outcome.name}`}
+      action={differentEmail}
+    >
+      You&apos;re already past this stage of onboarding, so you don&apos;t need
+      to check in for {kind.eventName}. Enjoy!
+    </StatusCard>
+  );
+}
+
+const STATUS_CARD_TONES = {
+  success: {
+    styles:
+      "border-green-300 bg-green-50 text-green-900 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200",
+    icon: CircleCheck,
+  },
+  info: {
+    styles:
+      "border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200",
+    icon: Info,
+  },
+  error: {
+    styles:
+      "border-red-300 bg-red-50 text-red-900 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200",
+    icon: CircleAlert,
+  },
+};
+
 function StatusCard({
   tone,
   title,
+  icon,
+  action,
   children,
 }: {
-  tone: "success" | "error";
+  tone: keyof typeof STATUS_CARD_TONES;
   title: string;
+  icon?: React.ComponentType<{ className?: string; size?: number }>;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const styles =
-    tone === "success"
-      ? "border-green-300 bg-green-50 text-green-900 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200"
-      : "border-red-300 bg-red-50 text-red-900 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200";
-  const Icon = tone === "success" ? CircleCheck : CircleAlert;
+  const { styles, icon: defaultIcon } = STATUS_CARD_TONES[tone];
+  const Icon = icon ?? defaultIcon;
 
   return (
     <div
@@ -300,6 +423,7 @@ function StatusCard({
       <Icon className="mx-auto" size={40} />
       <h2 className="mt-3 text-xl font-bold">{title}</h2>
       <p className="mt-2">{children}</p>
+      {action}
     </div>
   );
 }
