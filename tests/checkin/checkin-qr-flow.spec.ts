@@ -121,10 +121,10 @@ test.describe("QR self check-in", () => {
     });
     const session = await sessionRes.json();
 
-    // Codes are valid for one hour.
+    // Codes are valid for 30 minutes.
     const ttlMs = new Date(session.expires_at).getTime() - Date.now();
-    expect(ttlMs).toBeGreaterThan(58 * 60_000);
-    expect(ttlMs).toBeLessThanOrEqual(60 * 60_000);
+    expect(ttlMs).toBeGreaterThan(28 * 60_000);
+    expect(ttlMs).toBeLessThanOrEqual(30 * 60_000);
 
     const overlay = page.getByTestId("checkin-qr-overlay");
     await expect(overlay).toBeVisible();
@@ -149,7 +149,7 @@ test.describe("QR self check-in", () => {
     await expect(overlay).toBeHidden();
   });
 
-  test("the projected QR swaps to a new code before the hour is up", async ({
+  test("the projected QR swaps to a new code before the 30 minutes are up", async ({
     page,
   }) => {
     await page.clock.install();
@@ -161,7 +161,7 @@ test.describe("QR self check-in", () => {
       (r) =>
         r.url().endsWith("/api/v1/check_ins/session") && r.method() === "POST",
     );
-    await page.clock.fastForward("59:30");
+    await page.clock.fastForward("29:30");
     await refresh;
     await expect(page.getByTestId("checkin-qr-code")).toBeVisible();
     await expect(page.getByTestId("checkin-qr-expired")).toHaveCount(0);

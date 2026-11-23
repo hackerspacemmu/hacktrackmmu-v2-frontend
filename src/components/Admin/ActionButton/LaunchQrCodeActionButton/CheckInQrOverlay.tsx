@@ -160,7 +160,7 @@ export function CheckInQrOverlay({
 
       <p className="mt-5 text-sm text-gray-500 text-center">
         {isExpired
-          ? "Codes are valid for one hour."
+          ? "Codes are valid for 30 minutes."
           : `Valid until ${dayjs(expiresAt).format("h:mm A")} · a new code appears automatically`}
       </p>
     </div>,

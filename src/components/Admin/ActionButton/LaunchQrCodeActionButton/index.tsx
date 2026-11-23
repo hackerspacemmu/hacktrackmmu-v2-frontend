@@ -20,7 +20,7 @@ export function LaunchQrCodeActionButton({ kind }: { kind: CheckInKind }) {
   const [session, setSession] = useState<CheckInSession | null>(null);
   const [isLaunching, setIsLaunching] = useState(false);
 
-  // Each session token is valid for an hour (set by the backend) and is tied
+  // Each session token is valid for 30 minutes (set by the backend) and is tied
   // to this kind, which decides the status members are moved to.
   const requestSession = useCallback(async (): Promise<boolean> => {
     try {

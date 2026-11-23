@@ -21,7 +21,7 @@ import {
 
 // Public page opened by scanning a check-in QR code (regular session or Meet &
 // Greet) on the admin dashboard. The `token` query param (signed by the backend,
-// valid for an hour) authorises the check-in and fixes which event it is for.
+// valid for 30 minutes) authorises the check-in and fixes which event it is for.
 // Members must type their exact registered email: there is no search, so the
 // link can't be used to browse the membership list.
 
