@@ -6,6 +6,8 @@ import Image from "next/image";
 import dayjs from "dayjs";
 
 interface CheckInQrOverlayProps {
+  /** e.g. "Session Check-in" or "Meet & Greet Check-in". */
+  title: string;
   url: string;
   expiresAt: string;
   /** Fetches a new code; resolves false if it couldn't. */
@@ -20,6 +22,7 @@ const REFRESH_BEFORE_MS = 60_000;
 // Covers the whole screen so it can be projected at the Meet & Greet.
 // Always light-on-dark-text regardless of theme: QR scanners need contrast.
 export function CheckInQrOverlay({
+  title,
   url,
   expiresAt,
   onRefresh,
@@ -83,7 +86,7 @@ export function CheckInQrOverlay({
       ref={overlayRef}
       role="dialog"
       aria-modal="true"
-      aria-label="Meet & Greet check-in QR code"
+      aria-label={`${title} QR code`}
       data-testid="checkin-qr-overlay"
       className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white text-gray-900 p-6"
     >
@@ -113,7 +116,7 @@ export function CheckInQrOverlay({
         height={90}
       />
       <h1 className="mt-3 text-3xl sm:text-5xl font-extrabold tracking-tight text-center">
-        Meet &amp; Greet Check-in
+        {title}
       </h1>
       <p className="mt-2 text-lg sm:text-2xl text-gray-600 text-center">
         Scan with your phone camera, then enter the email you registered with.

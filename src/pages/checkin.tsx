@@ -6,17 +6,27 @@ import axios from "axios";
 import { CircleAlert, CircleCheck, LoaderCircle, Mail } from "lucide-react";
 import { apiUrl } from "@/utils/env";
 import { useDarkMode } from "@/hooks/useDarkMode";
+import {
+  CHECK_IN_KINDS,
+  isCheckInKind,
+  type CheckInKind,
+} from "@/components/Admin/ActionButton/LaunchQrCodeActionButton/checkInKinds";
 
-// Public page opened by scanning the Meet & Greet QR code on the admin dashboard.
-// The `token` query param (signed by the backend, valid for an hour) authorises
-// the check-in. Members must type their exact registered email: there is no
+// Public page opened by scanning a check-in QR code (regular session or Meet &
+// Greet) on the admin dashboard. The `token` query param (signed by the backend,
+// valid for an hour) authorises the check-in and fixes which event it is for. Members must type their exact registered email: there is no
 // search, so the link can't be used to browse the membership list.
 
 type PageState =
   | { kind: "verifying" }
   | { kind: "invalid"; message: string }
-  | { kind: "form" }
-  | { kind: "done"; name: string; alreadyCheckedIn: boolean };
+  | { kind: "form"; event: CheckInKind }
+  | {
+      kind: "done";
+      event: CheckInKind;
+      name: string;
+      alreadyCheckedIn: boolean;
+    };
 
 const EMAIL_NOT_FOUND_MESSAGE =
   "This email doesn't exist, are you sure you registered with this email?";
@@ -49,7 +59,14 @@ export default function CheckInPage() {
     if (!token) return;
     axios
       .get(`${apiUrl}/api/v1/check_ins/verify`, { params: { token } })
-      .then(() => setState({ kind: "form" }))
+      .then((res) =>
+        isCheckInKind(res.data.kind)
+          ? setState({ kind: "form", event: res.data.kind })
+          : setState({
+              kind: "invalid",
+              message: "We couldn't verify this QR code. Please try again.",
+            }),
+      )
       .catch((err) =>
         setState({
           kind: "invalid",
@@ -68,11 +85,15 @@ export default function CheckInPage() {
           "This check-in link is incomplete. Please scan the QR code again.",
       }
     : state;
+  const title =
+    view.kind === "form" || view.kind === "done"
+      ? CHECK_IN_KINDS[view.event].title
+      : "Check-in";
 
   return (
     <>
       <Head>
-        <title>Meet &amp; Greet Check-in | HackTrack MMU</title>
+        <title>{`${title} | HackTrack MMU`}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex" />
       </Head>
@@ -87,9 +108,7 @@ export default function CheckInPage() {
             height={80}
             className="mx-auto"
           />
-          <h1 className="mt-4 text-center text-3xl font-extrabold">
-            Meet &amp; Greet Check-in
-          </h1>
+          <h1 className="mt-4 text-center text-3xl font-extrabold">{title}</h1>
 
           {view.kind === "verifying" && (
             <div className="mt-10 flex justify-center text-gray-500">
@@ -110,7 +129,12 @@ export default function CheckInPage() {
             <CheckInForm
               token={token}
               onDone={(name, alreadyCheckedIn) =>
-                setState({ kind: "done", name, alreadyCheckedIn })
+                setState({
+                  kind: "done",
+                  event: view.event,
+                  name,
+                  alreadyCheckedIn,
+                })
               }
               onTokenRejected={handleTokenRejected}
             />
@@ -125,7 +149,7 @@ export default function CheckInPage() {
                   : `You're checked in, ${view.name}!`
               }
             >
-              Welcome to the Meet &amp; Greet. You can close this page now.
+              {CHECK_IN_KINDS[view.event].welcome} You can close this page now.
             </StatusCard>
           )}
         </div>

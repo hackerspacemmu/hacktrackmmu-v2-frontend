@@ -1,9 +1,10 @@
-// Meet & Greet QR self check-in.
+// QR self check-in for regular sessions and the Meet & Greet.
 //
-// Admin launches a full-screen QR code from the dashboard Control Panel; members open
-// /checkin?token=..., type the exact email they registered with, and move to
-// "attended_mg". There is deliberately no search: the link must not let anyone browse
-// the membership list.
+// Admin launches a full-screen QR code from the dashboard Control Panel ("Session QR
+// Code" or "M&G QR Code"); members open /checkin?token=..., type the exact email they
+// registered with, and move to "attended" (session) or "attended_mg" (M&G). Only
+// registered/contacted members can check in. There is deliberately no search: the link
+// must not let anyone browse the membership list.
 //
 // Every scenario runs against throwaway fixture members (see support/api.ts) so real
 // registered/contacted members are never checked in.
@@ -36,7 +37,11 @@ async function loginAsAdmin(page: Page) {
   await expect(page).toHaveURL("/dashboard", { timeout: 30000 });
 }
 
-async function createCheckInToken(): Promise<string> {
+type CheckInKind = "session" | "meet_and_greet";
+
+async function createCheckInToken(
+  kind: CheckInKind = "meet_and_greet",
+): Promise<string> {
   const ctx = await request.newContext({ baseURL: API_URL });
   try {
     const login = await ctx.post("/api/v1/login", {
@@ -45,6 +50,7 @@ async function createCheckInToken(): Promise<string> {
     const { token: adminToken } = await login.json();
     const res = await ctx.post("/api/v1/check_ins/session", {
       headers: { Authorization: `Bearer ${adminToken}` },
+      data: { kind },
     });
     expect(res.status()).toBe(201);
     return (await res.json()).token;
@@ -60,7 +66,7 @@ async function submitEmail(page: Page, email: string) {
 
 const firstName = (m: MemberFixture) => m.name.split(" ")[0];
 
-test.describe("Meet & Greet check-in", () => {
+test.describe("QR self check-in", () => {
   const created: MemberFixture[] = [];
 
   test.afterEach(async () => {
@@ -79,18 +85,24 @@ test.describe("Meet & Greet check-in", () => {
     return m;
   }
 
-  test("admin launches a full-screen QR code from the Control Panel row", async ({
+  test("admin launches a full-screen M&G QR code from the Control Panel row", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await loginAsAdmin(page);
 
-    const launch = page.getByRole("button", { name: "Launch QR Code" });
+    const launch = page.getByRole("button", { name: "M&G QR Code" });
     await expect(launch).toBeVisible({ timeout: 30000 });
 
-    // Same row as the other admin buttons on desktop.
+    // Both QR buttons sit in the same row as the other admin buttons on desktop.
     const rowTops = await Promise.all(
-      ["New Meetup", "New Project", "New Update", "Launch QR Code"].map(
+      [
+        "New Meetup",
+        "New Project",
+        "New Update",
+        "Session QR Code",
+        "M&G QR Code",
+      ].map(
         async (name) =>
           (await page.getByRole("button", { name }).boundingBox())!.y,
       ),
@@ -103,7 +115,11 @@ test.describe("Meet & Greet check-in", () => {
         r.request().method() === "POST",
     );
     await launch.click();
-    const session = await (await sessionResponse).json();
+    const sessionRes = await sessionResponse;
+    expect(sessionRes.request().postDataJSON()).toEqual({
+      kind: "meet_and_greet",
+    });
+    const session = await sessionRes.json();
 
     // Codes are valid for one hour.
     const ttlMs = new Date(session.expires_at).getTime() - Date.now();
@@ -112,6 +128,9 @@ test.describe("Meet & Greet check-in", () => {
 
     const overlay = page.getByTestId("checkin-qr-overlay");
     await expect(overlay).toBeVisible();
+    await expect(
+      overlay.getByRole("heading", { name: "Meet & Greet Check-in" }),
+    ).toBeVisible();
     await expect(overlay).toContainText("Valid until");
 
     // Overlay covers the whole viewport and the QR dominates it.
@@ -135,7 +154,7 @@ test.describe("Meet & Greet check-in", () => {
   }) => {
     await page.clock.install();
     await loginAsAdmin(page);
-    await page.getByRole("button", { name: "Launch QR Code" }).click();
+    await page.getByRole("button", { name: "M&G QR Code" }).click();
     await expect(page.getByTestId("checkin-qr-code")).toBeVisible();
 
     const refresh = page.waitForRequest(
@@ -166,7 +185,7 @@ test.describe("Meet & Greet check-in", () => {
     });
     await page.clock.install();
     await loginAsAdmin(page);
-    await page.getByRole("button", { name: "Launch QR Code" }).click();
+    await page.getByRole("button", { name: "M&G QR Code" }).click();
     await expect(page.getByTestId("checkin-qr-code")).toBeVisible();
 
     await page.clock.fastForward("02:00");
@@ -190,7 +209,7 @@ test.describe("Meet & Greet check-in", () => {
     const sessionResponse = page.waitForResponse((r) =>
       r.url().endsWith("/api/v1/check_ins/session"),
     );
-    await page.getByRole("button", { name: "Launch QR Code" }).click();
+    await page.getByRole("button", { name: "M&G QR Code" }).click();
     const { token } = await (await sessionResponse).json();
 
     // Member's phone: a fresh, signed-out context.
@@ -222,6 +241,75 @@ test.describe("Meet & Greet check-in", () => {
     }
 
     expect((await getMemberById(member.id))?.status).toBe("attended_mg");
+  });
+
+  test("scanning the Session QR moves a registered member to Attended", async ({
+    page,
+    browser,
+  }) => {
+    const member = await fixture("Checkin Session", "registered");
+
+    await loginAsAdmin(page);
+    const sessionResponse = page.waitForResponse((r) =>
+      r.url().endsWith("/api/v1/check_ins/session"),
+    );
+    await page.getByRole("button", { name: "Session QR Code" }).click();
+    const sessionRes = await sessionResponse;
+    expect(sessionRes.request().postDataJSON()).toEqual({ kind: "session" });
+    const { token } = await sessionRes.json();
+    await expect(
+      page
+        .getByTestId("checkin-qr-overlay")
+        .getByRole("heading", { name: "Session Check-in" }),
+    ).toBeVisible();
+
+    const phone = await browser.newContext({ ...devices["iPhone 13"] });
+    const m = await phone.newPage();
+    try {
+      await m.goto(`/checkin?token=${encodeURIComponent(token)}`);
+      await expect(
+        m.getByRole("heading", { name: "Session Check-in" }),
+      ).toBeVisible();
+      await submitEmail(m, member.email);
+      await expect(
+        m.getByRole("heading", {
+          name: `You're checked in, ${firstName(member)}!`,
+        }),
+      ).toBeVisible();
+      await expect(m.getByText("Welcome to today's session.")).toBeVisible();
+    } finally {
+      await phone.close();
+    }
+
+    expect((await getMemberById(member.id))?.status).toBe("attended");
+  });
+
+  test("members can't use the other event's QR once checked in", async ({
+    page,
+  }) => {
+    const attended = await fixture("Checkin Attended", "attended");
+    const attendedMg = await fixture("Checkin AttendedMG", "attended_mg");
+
+    // Attended (session) member scanning the M&G QR.
+    await page.goto(
+      `/checkin?token=${encodeURIComponent(await createCheckInToken("meet_and_greet"))}`,
+    );
+    await submitEmail(page, attended.email);
+    await expect(
+      page.getByText(/can't be used to check in to the Meet & Greet/),
+    ).toBeVisible({ timeout: 10000 });
+
+    // Attended M&G member scanning the Session QR.
+    await page.goto(
+      `/checkin?token=${encodeURIComponent(await createCheckInToken("session"))}`,
+    );
+    await submitEmail(page, attendedMg.email);
+    await expect(
+      page.getByText(/can't be used to check in to today's session/),
+    ).toBeVisible({ timeout: 10000 });
+
+    expect((await getMemberById(attended.id))?.status).toBe("attended");
+    expect((await getMemberById(attendedMg.id))?.status).toBe("attended_mg");
   });
 
   test("contacted members can check in; email case doesn't matter", async ({

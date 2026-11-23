@@ -6,24 +6,27 @@ import { CheckInQrOverlay } from "./CheckInQrOverlay";
 import useAuthStore from "@/store/useAuthStore";
 import { useToast } from "@/components/Toast/ToastProvider";
 import { apiUrl } from "@/utils/env";
+import { CHECK_IN_KINDS, type CheckInKind } from "./checkInKinds";
 
 interface CheckInSession {
   url: string;
   expiresAt: string;
 }
 
-export function LaunchQrCodeActionButton() {
+export function LaunchQrCodeActionButton({ kind }: { kind: CheckInKind }) {
+  const config = CHECK_IN_KINDS[kind];
   const { token } = useAuthStore();
   const { showToast } = useToast();
   const [session, setSession] = useState<CheckInSession | null>(null);
   const [isLaunching, setIsLaunching] = useState(false);
 
-  // Each session token is valid for an hour (set by the backend).
+  // Each session token is valid for an hour (set by the backend) and is tied
+  // to this kind, which decides the status members are moved to.
   const requestSession = useCallback(async (): Promise<boolean> => {
     try {
       const res = await axios.post(
         `${apiUrl}/api/v1/check_ins/session`,
-        {},
+        { kind },
         {
           headers: {
             Accept: "application/json",
@@ -37,7 +40,7 @@ export function LaunchQrCodeActionButton() {
     } catch {
       return false;
     }
-  }, [token]);
+  }, [token, kind]);
 
   const handleLaunch = async () => {
     if (isLaunching) return;
@@ -52,16 +55,17 @@ export function LaunchQrCodeActionButton() {
   return (
     <>
       <ActionButton
-        label={isLaunching ? "Launching..." : "Launch QR Code"}
+        label={isLaunching ? "Launching..." : config.buttonLabel}
         icon={<QrCode />}
         onClick={handleLaunch}
-        bgColor="border-teal-500"
-        textColor="text-teal-500"
-        hoverShadowColor="hover:shadow-teal-500/50"
+        bgColor={config.borderColor}
+        textColor={config.textColor}
+        hoverShadowColor={config.hoverShadowColor}
       />
 
       {session && (
         <CheckInQrOverlay
+          title={config.title}
           url={session.url}
           expiresAt={session.expiresAt}
           onRefresh={requestSession}
