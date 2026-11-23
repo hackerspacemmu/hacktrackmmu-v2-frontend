@@ -1,10 +1,17 @@
 // Meet & Greet QR self check-in.
 //
 // Admin launches a full-screen QR code from the dashboard Control Panel; members open
-// /checkin?token=..., search for themselves, confirm, and move to "attended_mg".
+// /checkin?token=..., type the exact email they registered with, and move to
+// "attended_mg". There is deliberately no search: the link must not let anyone browse
+// the membership list.
 //
 // Every scenario runs against throwaway fixture members (see support/api.ts) so real
 // registered/contacted members are never checked in.
+//
+// NOTE: failed lookups are rate limited per IP by the backend (20 per 10 minutes, kept
+// in the Rails process's memory). These scenarios only make a few failed attempts per
+// run; restart the Rails server if you run them many times in a row and start seeing
+// "Too many attempts".
 
 import { test, expect, request, devices, type Page } from "@playwright/test";
 import {
@@ -45,6 +52,13 @@ async function createCheckInToken(): Promise<string> {
     await ctx.dispose();
   }
 }
+
+async function submitEmail(page: Page, email: string) {
+  await page.getByRole("textbox", { name: "Your email" }).fill(email);
+  await page.getByRole("button", { name: "Check in" }).click();
+}
+
+const firstName = (m: MemberFixture) => m.name.split(" ")[0];
 
 test.describe("Meet & Greet check-in", () => {
   const created: MemberFixture[] = [];
@@ -89,13 +103,16 @@ test.describe("Meet & Greet check-in", () => {
         r.request().method() === "POST",
     );
     await launch.click();
-    expect((await sessionResponse).status()).toBe(201);
+    const session = await (await sessionResponse).json();
+
+    // Codes are valid for one hour.
+    const ttlMs = new Date(session.expires_at).getTime() - Date.now();
+    expect(ttlMs).toBeGreaterThan(58 * 60_000);
+    expect(ttlMs).toBeLessThanOrEqual(60 * 60_000);
 
     const overlay = page.getByTestId("checkin-qr-overlay");
     await expect(overlay).toBeVisible();
-    await expect(
-      overlay.getByRole("heading", { name: "Meet & Greet Check-in" }),
-    ).toBeVisible();
+    await expect(overlay).toContainText("Valid until");
 
     // Overlay covers the whole viewport and the QR dominates it.
     const overlayBox = (await overlay.boundingBox())!;
@@ -113,7 +130,56 @@ test.describe("Meet & Greet check-in", () => {
     await expect(overlay).toBeHidden();
   });
 
-  test("scanning the launched QR lets a registered member check in", async ({
+  test("the projected QR swaps to a new code before the hour is up", async ({
+    page,
+  }) => {
+    await page.clock.install();
+    await loginAsAdmin(page);
+    await page.getByRole("button", { name: "Launch QR Code" }).click();
+    await expect(page.getByTestId("checkin-qr-code")).toBeVisible();
+
+    const refresh = page.waitForRequest(
+      (r) =>
+        r.url().endsWith("/api/v1/check_ins/session") && r.method() === "POST",
+    );
+    await page.clock.fastForward("59:30");
+    await refresh;
+    await expect(page.getByTestId("checkin-qr-code")).toBeVisible();
+    await expect(page.getByTestId("checkin-qr-expired")).toHaveCount(0);
+  });
+
+  test("an expired QR is hidden when a new code can't be fetched", async ({
+    page,
+  }) => {
+    let calls = 0;
+    await page.route("**/api/v1/check_ins/session", (route) => {
+      calls += 1;
+      return calls === 1
+        ? route.fulfill({
+            status: 201,
+            json: {
+              token: "short-lived",
+              expires_at: new Date(Date.now() + 90_000).toISOString(),
+            },
+          })
+        : route.fulfill({ status: 401, json: { error: "expired" } });
+    });
+    await page.clock.install();
+    await loginAsAdmin(page);
+    await page.getByRole("button", { name: "Launch QR Code" }).click();
+    await expect(page.getByTestId("checkin-qr-code")).toBeVisible();
+
+    await page.clock.fastForward("02:00");
+    await expect(page.getByTestId("checkin-qr-code")).toHaveCount(0);
+    await expect(page.getByTestId("checkin-qr-expired")).toContainText(
+      "This QR code has expired",
+    );
+    await expect(
+      page.getByRole("button", { name: "Generate new code" }),
+    ).toBeVisible();
+  });
+
+  test("scanning the launched QR lets a registered member check in by email", async ({
     page,
     browser,
   }) => {
@@ -139,21 +205,18 @@ test.describe("Meet & Greet check-in", () => {
       await m.waitForTimeout(1000);
       await expect(m).toHaveURL(/\/checkin\?token=/);
 
-      const search = m.getByRole("combobox");
-      await search.fill(member.name.split(" ").slice(1, 3).join(" ")); // partial name
-      const option = m.getByRole("option", { name: new RegExp(member.name) });
-      await expect(option).toBeVisible({ timeout: 10000 });
-      // Email shown masked, never in full.
-      await expect(option).toContainText("@e2e.invalid");
-      await expect(option).not.toContainText(member.email);
+      // No search UI at all.
+      await expect(m.getByRole("combobox")).toHaveCount(0);
+      await expect(m.getByRole("listbox")).toHaveCount(0);
 
-      await option.click();
-      await expect(m.getByText("Checking in as")).toBeVisible();
-      await m.getByRole("button", { name: "Confirm" }).click();
-
+      await submitEmail(m, member.email);
       await expect(
-        m.getByRole("heading", { name: `You're checked in, ${member.name}!` }),
+        m.getByRole("heading", {
+          name: `You're checked in, ${firstName(member)}!`,
+        }),
       ).toBeVisible();
+      // Only the first name comes back, never the full name.
+      await expect(m.getByText(member.name)).toHaveCount(0);
     } finally {
       await phone.close();
     }
@@ -161,64 +224,65 @@ test.describe("Meet & Greet check-in", () => {
     expect((await getMemberById(member.id))?.status).toBe("attended_mg");
   });
 
-  test("contacted members can check in; other statuses are not listed", async ({
+  test("contacted members can check in; email case doesn't matter", async ({
     page,
   }) => {
     const contacted = await fixture("Checkin Con", "contacted");
-    const active = await fixture("Checkin Act", "active");
     const token = await createCheckInToken();
 
     await page.goto(`/checkin?token=${encodeURIComponent(token)}`);
-    const search = page.getByRole("combobox");
-
-    // Active member: nothing to pick, so the not-registered message shows.
-    await search.fill(active.name);
-    await expect(page.getByText(EMAIL_NOT_FOUND)).toBeVisible({
-      timeout: 10000,
-    });
-    await expect(page.getByRole("option")).toHaveCount(0);
-
-    // Contacted member, found by exact email.
-    await search.fill(contacted.email);
-    await page
-      .getByRole("option", { name: new RegExp(contacted.name) })
-      .click();
-    await page.getByRole("button", { name: "Confirm" }).click();
+    await submitEmail(page, `  ${contacted.email.toUpperCase()} `);
     await expect(
       page.getByRole("heading", { name: /You're checked in/ }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 10000 });
 
     expect((await getMemberById(contacted.id))?.status).toBe("attended_mg");
-    expect((await getMemberById(active.id))?.status).toBe("active");
   });
 
-  test("an unknown email shows the not-registered message", async ({
+  test("names and partial emails don't check anyone in", async ({ page }) => {
+    const member = await fixture("Checkin Partial", "registered");
+    const token = await createCheckInToken();
+    await page.goto(`/checkin?token=${encodeURIComponent(token)}`);
+
+    // A name is not an email.
+    await submitEmail(page, member.name);
+    await expect(
+      page.getByText("Please enter a valid email address."),
+    ).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Missing the last character of the TLD.
+    await submitEmail(page, member.email.slice(0, -1));
+    await expect(page.getByText(EMAIL_NOT_FOUND)).toBeVisible({
+      timeout: 10000,
+    });
+
+    expect((await getMemberById(member.id))?.status).toBe("registered");
+  });
+
+  test("an email that isn't registered shows the not-registered message", async ({
     page,
   }) => {
     const token = await createCheckInToken();
     await page.goto(`/checkin?token=${encodeURIComponent(token)}`);
 
-    await page
-      .getByRole("combobox")
-      .fill(`nobody-${Date.now()}@nowhere.invalid`);
+    await submitEmail(page, `nobody-${Date.now()}@nowhere.invalid`);
     await expect(page.getByText(EMAIL_NOT_FOUND)).toBeVisible({
       timeout: 10000,
     });
   });
 
-  test("'My email isn't listed' shows the not-registered message", async ({
-    page,
-  }) => {
-    const member = await fixture("Checkin Unlisted", "registered");
+  test("members past onboarding can't use the check-in", async ({ page }) => {
+    const active = await fixture("Checkin Act", "active");
     const token = await createCheckInToken();
     await page.goto(`/checkin?token=${encodeURIComponent(token)}`);
 
-    await page.getByRole("combobox").fill(member.name);
+    await submitEmail(page, active.email);
     await expect(
-      page.getByRole("option", { name: new RegExp(member.name) }),
+      page.getByText(/can't be used to check in to the Meet & Greet/),
     ).toBeVisible({ timeout: 10000 });
-    await page.getByRole("button", { name: "My email isn't listed" }).click();
-    await expect(page.getByText(EMAIL_NOT_FOUND)).toBeVisible();
+    expect((await getMemberById(active.id))?.status).toBe("active");
   });
 
   test("an invalid or missing token is rejected", async ({ page }) => {
@@ -226,7 +290,9 @@ test.describe("Meet & Greet check-in", () => {
     await expect(
       page.getByRole("heading", { name: "QR code not valid" }),
     ).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole("combobox")).toHaveCount(0);
+    await expect(page.getByRole("textbox", { name: "Your email" })).toHaveCount(
+      0,
+    );
 
     await page.goto("/checkin");
     await expect(

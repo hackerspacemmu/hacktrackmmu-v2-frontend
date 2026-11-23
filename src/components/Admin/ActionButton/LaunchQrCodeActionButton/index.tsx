@@ -1,5 +1,5 @@
 import { QrCode } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import axios from "axios";
 import { ActionButton } from "..";
 import { CheckInQrOverlay } from "./CheckInQrOverlay";
@@ -18,9 +18,8 @@ export function LaunchQrCodeActionButton() {
   const [session, setSession] = useState<CheckInSession | null>(null);
   const [isLaunching, setIsLaunching] = useState(false);
 
-  const handleLaunch = async () => {
-    if (isLaunching) return;
-    setIsLaunching(true);
+  // Each session token is valid for an hour (set by the backend).
+  const requestSession = useCallback(async (): Promise<boolean> => {
     try {
       const res = await axios.post(
         `${apiUrl}/api/v1/check_ins/session`,
@@ -34,10 +33,19 @@ export function LaunchQrCodeActionButton() {
       );
       const url = `${window.location.origin}/checkin?token=${encodeURIComponent(res.data.token)}`;
       setSession({ url, expiresAt: res.data.expires_at });
+      return true;
     } catch {
+      return false;
+    }
+  }, [token]);
+
+  const handleLaunch = async () => {
+    if (isLaunching) return;
+    setIsLaunching(true);
+    const ok = await requestSession();
+    setIsLaunching(false);
+    if (!ok) {
       showToast("Couldn't launch the check-in QR code. Try again.", "error");
-    } finally {
-      setIsLaunching(false);
     }
   };
 
@@ -56,6 +64,7 @@ export function LaunchQrCodeActionButton() {
         <CheckInQrOverlay
           url={session.url}
           expiresAt={session.expiresAt}
+          onRefresh={requestSession}
           onClose={() => setSession(null)}
         />
       )}
