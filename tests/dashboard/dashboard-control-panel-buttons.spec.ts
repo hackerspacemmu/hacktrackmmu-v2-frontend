@@ -4,7 +4,7 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Dashboard", () => {
-  test("Admin Control Panel exposes exactly New Meetup, New Project, New Update, Session QR Code, M&G QR Code", async ({
+  test("Admin Control Panel exposes exactly New Meetup, New Project, New Update, Meetup First Timers, M&G First Timers", async ({
     page,
   }) => {
     // 1. Navigate to /login, log in as admin, land on /dashboard
@@ -29,8 +29,8 @@ test.describe("Dashboard", () => {
     const controlPanelGrid = page.getByTestId("control-panel");
 
     // expect: Exactly five buttons are present, all in one row on desktop:
-    // 'New Meetup', 'New Project', 'New Update', then 'Session QR Code' and
-    // 'M&G QR Code' sharing the fourth slot as two square-ish buttons
+    // 'New Meetup', 'New Project', 'New Update', then 'Meetup First Timers' and
+    // 'M&G First Timers' sharing the fourth slot as two square-ish buttons
     await expect(controlPanelGrid.getByRole("button")).toHaveCount(5, {
       timeout: 15000,
     });
@@ -39,8 +39,8 @@ test.describe("Dashboard", () => {
         "New Meetup",
         "New Project",
         "New Update",
-        "Session QR Code",
-        "M&G QR Code",
+        "Meetup First Timers",
+        "M&G First Timers",
       ],
       { timeout: 15000 },
     );
@@ -51,8 +51,8 @@ test.describe("Dashboard", () => {
       (await controlPanelGrid.getByRole("button", { name }).boundingBox())!;
     const meetup = await box("New Meetup");
     const update = await box("New Update");
-    const session = await box("Session QR Code");
-    const mg = await box("M&G QR Code");
+    const session = await box("Meetup First Timers");
+    const mg = await box("M&G First Timers");
     for (const b of [update, session, mg]) {
       expect(Math.abs(b.y - meetup.y)).toBeLessThan(2);
       expect(Math.abs(b.height - meetup.height)).toBeLessThan(2);

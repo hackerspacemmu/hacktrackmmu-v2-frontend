@@ -1,7 +1,7 @@
 // QR self check-in for regular sessions and the Meet & Greet.
 //
-// Admin launches a full-screen QR code from the dashboard Control Panel ("Session QR
-// Code" or "M&G QR Code"); members open /checkin?token=..., type the exact email they
+// Admin launches a full-screen QR code from the dashboard Control Panel ("Meetup
+// First Timers" or "M&G First Timers"); members open /checkin?token=..., type the exact email they
 // registered with, and move to "attended" (session) or "attended_mg" (M&G). Only
 // registered/contacted members can check in. There is deliberately no search: the link
 // must not let anyone browse the membership list.
@@ -91,7 +91,7 @@ test.describe("QR self check-in", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await loginAsAdmin(page);
 
-    const launch = page.getByRole("button", { name: "M&G QR Code" });
+    const launch = page.getByRole("button", { name: "M&G First Timers" });
     await expect(launch).toBeVisible({ timeout: 30000 });
 
     // Both QR buttons sit in the same row as the other admin buttons on desktop.
@@ -100,8 +100,8 @@ test.describe("QR self check-in", () => {
         "New Meetup",
         "New Project",
         "New Update",
-        "Session QR Code",
-        "M&G QR Code",
+        "Meetup First Timers",
+        "M&G First Timers",
       ].map(
         async (name) =>
           (await page.getByRole("button", { name }).boundingBox())!.y,
@@ -154,7 +154,7 @@ test.describe("QR self check-in", () => {
   }) => {
     await page.clock.install();
     await loginAsAdmin(page);
-    await page.getByRole("button", { name: "M&G QR Code" }).click();
+    await page.getByRole("button", { name: "M&G First Timers" }).click();
     await expect(page.getByTestId("checkin-qr-code")).toBeVisible();
 
     const refresh = page.waitForRequest(
@@ -185,7 +185,7 @@ test.describe("QR self check-in", () => {
     });
     await page.clock.install();
     await loginAsAdmin(page);
-    await page.getByRole("button", { name: "M&G QR Code" }).click();
+    await page.getByRole("button", { name: "M&G First Timers" }).click();
     await expect(page.getByTestId("checkin-qr-code")).toBeVisible();
 
     await page.clock.fastForward("02:00");
@@ -209,7 +209,7 @@ test.describe("QR self check-in", () => {
     const sessionResponse = page.waitForResponse((r) =>
       r.url().endsWith("/api/v1/check_ins/session"),
     );
-    await page.getByRole("button", { name: "M&G QR Code" }).click();
+    await page.getByRole("button", { name: "M&G First Timers" }).click();
     const { token } = await (await sessionResponse).json();
 
     // Member's phone: a fresh, signed-out context.
@@ -253,7 +253,7 @@ test.describe("QR self check-in", () => {
     const sessionResponse = page.waitForResponse((r) =>
       r.url().endsWith("/api/v1/check_ins/session"),
     );
-    await page.getByRole("button", { name: "Session QR Code" }).click();
+    await page.getByRole("button", { name: "Meetup First Timers" }).click();
     const sessionRes = await sessionResponse;
     expect(sessionRes.request().postDataJSON()).toEqual({ kind: "session" });
     const { token } = await sessionRes.json();

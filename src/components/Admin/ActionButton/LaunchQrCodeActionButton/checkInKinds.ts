@@ -20,7 +20,7 @@ export const CHECK_IN_KINDS: Record<
   }
 > = {
   session: {
-    buttonLabel: "Session QR Code",
+    buttonLabel: "Meetup First Timers",
     title: "Session Check-in",
     welcome: "Welcome to today's session.",
     eventName: "today's session",
@@ -30,7 +30,7 @@ export const CHECK_IN_KINDS: Record<
     hoverShadowColor: "hover:shadow-orange-500/50",
   },
   meet_and_greet: {
-    buttonLabel: "M&G QR Code",
+    buttonLabel: "M&G First Timers",
     title: "Meet & Greet Check-in",
     welcome: "Welcome to the Meet & Greet.",
     eventName: "the Meet & Greet",

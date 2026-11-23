@@ -52,10 +52,23 @@ export function LaunchQrCodeActionButton({ kind }: { kind: CheckInKind }) {
     }
   };
 
+  // The two QR buttons share one grid slot, so the label always breaks after
+  // its first word ("Meetup / First Timers", "M&G / First Timers") to keep
+  // both buttons the same shape.
+  const [firstWord, ...restWords] = config.buttonLabel.split(" ");
+  const label = isLaunching ? (
+    "Launching..."
+  ) : (
+    <>
+      {firstWord} <br />
+      {restWords.join(" ")}
+    </>
+  );
+
   return (
     <>
       <ActionButton
-        label={isLaunching ? "Launching..." : config.buttonLabel}
+        label={label}
         icon={<QrCode />}
         onClick={handleLaunch}
         bgColor={config.borderColor}

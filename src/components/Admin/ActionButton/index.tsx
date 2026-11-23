@@ -4,7 +4,7 @@ interface TypeButton {
   onClick: () => void;
   icon: ReactNode;
   bgColor: string;
-  label: string;
+  label: ReactNode;
   textColor: string;
   hoverShadowColor: string;
 }
