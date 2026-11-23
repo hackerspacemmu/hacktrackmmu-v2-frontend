@@ -1,6 +1,7 @@
 export enum MemberStatus {
   Registered = "registered",
   Contacted = "contacted",
+  AttendedMG = "attended_mg",
   FirstTalkGiven = "first_talk_given",
   NeverActive = "never_active",
   Active = "active",
@@ -15,6 +16,7 @@ export enum MemberStatus {
 export const MemberStatusLabels: Record<MemberStatus, string> = {
   [MemberStatus.Registered]: "Registered",
   [MemberStatus.Contacted]: "Contacted",
+  [MemberStatus.AttendedMG]: "Attended M&G",
   [MemberStatus.FirstTalkGiven]: "First Talk Given",
   [MemberStatus.NeverActive]: "Never Active",
   [MemberStatus.Active]: "Active",

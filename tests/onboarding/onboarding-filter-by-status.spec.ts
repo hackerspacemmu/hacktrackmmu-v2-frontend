@@ -45,7 +45,7 @@ test.describe("Onboarding", () => {
     await page.getByRole("button", { name: "Filter" }).click();
 
     // expect: The Status selector includes an 'All' option plus every member status
-    // option (Registered, Contacted, First Talk Given, Never Active, Active, Socially
+    // option (Registered, Contacted, Attended M&G, First Talk Given, Never Active, Active, Socially
     // Active, Was Active, Was Socially Active, Terminated, Duplicate), and a 'Sort By'
     // selector offers Latest Registered / Earliest Registered / Recent Talks /
     // Alphabetical
@@ -61,6 +61,7 @@ test.describe("Onboarding", () => {
       "All",
       "Registered",
       "Contacted",
+      "Attended M&G",
       "First Talk Given",
       "Never Active",
       "Active",

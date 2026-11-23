@@ -4,7 +4,7 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Dashboard", () => {
-  test("Admin Control Panel exposes exactly New Meetup, New Project, New Update", async ({
+  test("Admin Control Panel exposes exactly New Meetup, New Project, New Update, Launch QR Code", async ({
     page,
   }) => {
     // 1. Navigate to /login, log in as admin, land on /dashboard
@@ -34,12 +34,13 @@ test.describe("Dashboard", () => {
       .locator("div.grid")
       .filter({ has: page.getByRole("button") });
 
-    // expect: Exactly three buttons are present: 'New Meetup', 'New Project', 'New Update'
-    await expect(controlPanelGrid.getByRole("button")).toHaveCount(3, {
+    // expect: Exactly four buttons are present, all in one row on desktop:
+    // 'New Meetup', 'New Project', 'New Update', 'Launch QR Code'
+    await expect(controlPanelGrid.getByRole("button")).toHaveCount(4, {
       timeout: 15000,
     });
     await expect(controlPanelGrid.getByRole("button")).toHaveText(
-      ["New Meetup", "New Project", "New Update"],
+      ["New Meetup", "New Project", "New Update", "Launch QR Code"],
       { timeout: 15000 },
     );
 

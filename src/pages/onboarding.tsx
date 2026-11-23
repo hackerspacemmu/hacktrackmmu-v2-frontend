@@ -22,6 +22,7 @@ const ALL_STATUSES = Object.values(MemberStatus);
 const ONBOARDING_STATUSES = [
   MemberStatus.Registered,
   MemberStatus.Contacted,
+  MemberStatus.AttendedMG,
   MemberStatus.FirstTalkGiven,
 ];
 
