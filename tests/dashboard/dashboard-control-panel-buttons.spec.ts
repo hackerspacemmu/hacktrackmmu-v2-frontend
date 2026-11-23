@@ -26,16 +26,11 @@ test.describe("Dashboard", () => {
     });
 
     // 2. Enumerate buttons inside the Control Panel grid
-    // The Control Panel grid is the only `div.grid` on the dashboard that contains
-    // buttons (the Meetups/Hackathons/Active Members sections use `div.grid` too, but
-    // for their card lists, which have no buttons), so filtering by "has a button" is
-    // enough to scope to it uniquely without relying on a fragile CSS class match.
-    const controlPanelGrid = page
-      .locator("div.grid")
-      .filter({ has: page.getByRole("button") });
+    const controlPanelGrid = page.getByTestId("control-panel");
 
     // expect: Exactly five buttons are present, all in one row on desktop:
-    // 'New Meetup', 'New Project', 'New Update', 'Session QR Code', 'M&G QR Code'
+    // 'New Meetup', 'New Project', 'New Update', then 'Session QR Code' and
+    // 'M&G QR Code' sharing the fourth slot as two square-ish buttons
     await expect(controlPanelGrid.getByRole("button")).toHaveCount(5, {
       timeout: 15000,
     });
@@ -49,6 +44,24 @@ test.describe("Dashboard", () => {
       ],
       { timeout: 15000 },
     );
+
+    // expect: On desktop all five sit in one row, and the two QR buttons split the
+    // fourth slot between them, so each is about half as wide as an admin button.
+    const box = async (name: string) =>
+      (await controlPanelGrid.getByRole("button", { name }).boundingBox())!;
+    const meetup = await box("New Meetup");
+    const update = await box("New Update");
+    const session = await box("Session QR Code");
+    const mg = await box("M&G QR Code");
+    for (const b of [update, session, mg]) {
+      expect(Math.abs(b.y - meetup.y)).toBeLessThan(2);
+      expect(Math.abs(b.height - meetup.height)).toBeLessThan(2);
+    }
+    expect(session.x).toBeGreaterThan(update.x + update.width);
+    expect(mg.x).toBeGreaterThan(session.x + session.width);
+    expect(session.width).toBeLessThan(meetup.width * 0.6);
+    expect(Math.abs(session.width - mg.width)).toBeLessThan(2);
+    expect(mg.x + mg.width - session.x).toBeLessThan(meetup.width + 2);
 
     // expect: No 'New Member' button exists anywhere on the dashboard (there is no UI
     // path to create a member; this documents current behavior, not necessarily desired

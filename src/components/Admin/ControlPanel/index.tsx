@@ -20,15 +20,22 @@ export default function ControlPanel({
       <div className="flex items-center mt-10">
         <h2 className="text-3xl font-semibold mb-2">Control Panel</h2>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div
+        data-testid="control-panel"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+      >
         <NewMeetupActionButton
           mutateMeetups={mutateMeetups}
           mutateHackathons={mutateHackathons}
         />
         <NewProjectActionButton mutateMembers={mutateMembers} />
         <NewUpdateActionButton />
-        <LaunchQrCodeActionButton kind="session" />
-        <LaunchQrCodeActionButton kind="meet_and_greet" />
+        {/* The two check-in QR buttons share the fourth slot, so they come out
+            square-ish next to the three wider admin buttons. */}
+        <div className="grid grid-cols-2 gap-4">
+          <LaunchQrCodeActionButton kind="session" />
+          <LaunchQrCodeActionButton kind="meet_and_greet" />
+        </div>
       </div>
     </>
   );

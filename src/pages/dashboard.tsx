@@ -66,12 +66,14 @@ export default function Home() {
             <div className="flex justify-between items-center">
               <h2 className="text-3xl font-semibold">Control Panel</h2>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
               <SkeletonActionButton />
               <SkeletonActionButton />
               <SkeletonActionButton />
-              <SkeletonActionButton />
-              <SkeletonActionButton />
+              <div className="grid grid-cols-2 gap-4">
+                <SkeletonActionButton />
+                <SkeletonActionButton />
+              </div>
             </div>
           </div>
         )}
